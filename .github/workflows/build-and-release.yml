@@ -1,0 +1,253 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  build-linux:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Install dependencies
+      run: |
+        poetry install --no-root --no-dev
+        poetry add pyinstaller
+
+    - name: Build executable as directory for Linux
+      run: |
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" --hidden-import OCP --hidden-import vtkmodules.all orion_cli/cli.py
+
+    - name: Rename output directory
+      run: |
+        mv dist/orion dist/orion_linux
+
+    - name: Zip the output directory
+      run: |
+        cd dist && zip -r orion_linux.zip orion_linux
+
+    - name: Upload zipped executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_linux
+        path: dist/orion_linux.zip
+
+
+
+  build-macos-intel:
+    runs-on: macos-13
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+
+    - name: Install dependencies
+      run: |
+        poetry install --no-root --no-dev
+        poetry add pyinstaller
+
+    - name: Build executable as directory
+      run: |
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" --hidden-import OCP --hidden-import vtkmodules.all orion_cli/cli.py
+
+    - name: Rename output directory
+      run: |
+        mv dist/orion dist/orion_intel
+
+    - name: Zip the output directory
+      run: |
+        cd dist && zip -r orion_intel.zip orion_intel
+
+    - name: Upload zipped executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_intel
+        path: dist/orion_intel.zip
+
+  build-macos-arm:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+
+    - name: Install dependencies
+      run: |
+        poetry install --no-root --no-dev --extras arm
+        poetry add pyinstaller
+
+    - name: Install cmake
+      run: |
+        brew install cmake
+    
+    - name: Build and install nlopt
+      run: |
+        git clone https://github.com/stevengj/nlopt.git
+        cd nlopt
+        mkdir build
+        cd build
+        cmake ..
+        make
+        sudo make install
+
+    - name: Build executable as directory
+      run: |
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" --hidden-import OCP --hidden-import vtkmodules.all orion_cli/cli.py
+
+    - name: Rename output directory
+      run: |
+        mv dist/orion dist/orion_arm
+
+    - name: Zip the output directory
+      run: |
+        cd dist && zip -r orion_arm.zip orion_arm
+
+    - name: Upload zipped executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_arm
+        path: dist/orion_arm.zip
+
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+      shell: powershell
+
+    - name: Add Poetry to PATH
+      run: |
+        $env:Path += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
+        [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Process)
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry --version
+      shell: powershell
+
+    - name: Install dependencies
+      run: |
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install --no-root --no-dev
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry add pyinstaller
+      shell: powershell
+
+    - name: Build executable as directory for Windows
+      run: |
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py;orion_cli/services" --hidden-import OCP --hidden-import vtkmodules.all orion_cli/cli.py
+      shell: powershell
+
+    - name: Rename output directory
+      run: |
+        Rename-Item -Path dist\orion -NewName orion_windows
+      shell: powershell
+
+    - name: Zip the output directory
+      run: |
+        Compress-Archive -Path dist\orion_windows -DestinationPath dist\orion_windows.zip
+      shell: powershell
+
+    - name: Upload zipped executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_windows
+        path: dist\orion_windows.zip
+
+
+  release:
+    needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_linux
+        path: ./release_artifacts/orion_linux
+
+    - name: Download Intel macOS artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_intel
+        path: ./release_artifacts/orion_intel
+
+    - name: Download Apple Silicon macOS artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_arm
+        path: ./release_artifacts/orion_arm
+
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_windows
+        path: ./release_artifacts/orion_windows
+
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./release_artifacts/orion_linux/orion_linux.zip
+          ./release_artifacts/orion_intel/orion_intel.zip
+          ./release_artifacts/orion_arm/orion_arm.zip
+          ./release_artifacts/orion_windows/orion_windows.zip
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

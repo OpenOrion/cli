@@ -1,0 +1,101 @@
+name: Run Unit Tests
+
+on: 
+  push: 
+    branches: 
+      - main
+  pull_request: 
+    branches: 
+      - main
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-14, macos-13, windows-latest]
+    steps:
+      #----------------------------------------------
+      #       check-out repo and set-up python
+      #----------------------------------------------
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up python
+        id: setup-python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      #----------------------------------------------
+      #  -----  install & configure poetry  -----
+      #----------------------------------------------
+      - name: Install Poetry (Linux/Mac)
+        if: runner.os != 'Windows'
+        uses: snok/install-poetry@v1
+        with:
+          virtualenvs-create: true
+          virtualenvs-in-project: true
+          installer-parallel: true
+
+      - name: Install Poetry (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        shell: powershell
+
+      - name: Add Poetry to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          $env:Path += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
+          [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Process)
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry --version
+        shell: powershell
+
+      #----------------------------------------------
+      # Remove poetry.lock if it exists
+      #----------------------------------------------
+      - name: Remove poetry.lock (Linux/Mac)
+        if: runner.os != 'Windows'
+        run: |
+          if [ -f poetry.lock ]; then
+            rm poetry.lock
+          fi
+
+      - name: Remove poetry.lock (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          if (Test-Path -Path poetry.lock) { Remove-Item poetry.lock }
+        shell: powershell
+
+      #----------------------------------------------
+      # install your root project, if required
+      #----------------------------------------------
+      - name: Install project (Linux/Mac)
+        if: runner.os != 'Windows'
+        run: poetry install --no-interaction
+
+      - name: Install project (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install --no-interaction
+        shell: powershell
+
+      #----------------------------------------------
+      #              run test suite
+      #----------------------------------------------
+      - name: Run tests (Linux/Mac)
+        if: runner.os != 'Windows'
+        run: poetry run pytest
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry run pytest
+        shell: powershell
+
+
+
+
+
+

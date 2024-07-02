@@ -33,7 +33,7 @@ jobs:
           if [ "${{ matrix.arch }}" == "arm64" ]; then
             arch -arm64 poetry run pyinstaller orion.spec
           else
-            poetry run pyinstaller orion.spec
+            arch -x86_64 poetry run pyinstaller orion.spec
           fi
           mv dist/orion/orion dist/orion/orion_${{ matrix.arch }}
 
@@ -43,5 +43,6 @@ jobs:
           files: dist/orion/orion_${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 

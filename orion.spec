@@ -1,10 +1,8 @@
 # orion.spec
 # This is a basic PyInstaller spec file for the orion_cli project.
 
-# Import the Analysis, PYZ, EXE, COLLECT, and BUNDLE classes
 import sys
 from PyInstaller.utils.hooks import collect_submodules
-from PyInstaller.__main__ import run
 
 # Path to the entry point of your CLI application
 entry_point = "orion_cli/cli.py"
@@ -12,13 +10,6 @@ entry_point = "orion_cli/cli.py"
 # Determine the platform-specific binary name
 platform = sys.platform
 binary_name = "orion"
-
-if platform.startswith("linux"):
-    binary_name += "_linux"
-elif platform.startswith("darwin"):
-    binary_name += "_mac"
-elif platform.startswith("win"):
-    binary_name += "_windows.exe"
 
 # Additional hidden imports, if any
 hidden_imports = collect_submodules('orion_cli.services')
@@ -65,3 +56,4 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion'
 )
+

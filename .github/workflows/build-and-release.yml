@@ -12,6 +12,16 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest, windows-latest]
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            extension: ""
+          - os: macos-latest
+            platform: mac
+            extension: ""
+          - os: windows-latest
+            platform: windows
+            extension: ".exe"
 
     runs-on: ${{ matrix.os }}
 
@@ -33,10 +43,15 @@ jobs:
         run: |
           poetry run pyinstaller orion.spec
 
+      - name: Rename binary
+        run: |
+          mv dist/orion/orion${{ matrix.extension }} dist/orion/orion
+
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/orion/orion*
+          files: dist/orion/orion
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 

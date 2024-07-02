@@ -6,7 +6,7 @@ on:
       - 'v*.*.*'
 
 jobs:
-  build:
+  build-linux:
     runs-on: ubuntu-latest
 
     steps:
@@ -37,6 +37,71 @@ jobs:
           dist/orion/orion
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos-latest:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Install dependencies
+      run: |
+        poetry install
+        poetry add pyinstaller
+
+    - name: Build executable
+      run: poetry run pyinstaller --target-arch=universal2 orion.spec
+
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/orion/orion
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  build-macos-older:
+    runs-on: macos-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        curl -sSL https://install.python-poetry.org | python3 -
+
+    - name: Install dependencies
+      run: |
+        poetry install
+        poetry add pyinstaller
+
+    - name: Build executable
+      run: poetry run pyinstaller --target-arch=intel orion.spec
+
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          dist/orion/orion
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

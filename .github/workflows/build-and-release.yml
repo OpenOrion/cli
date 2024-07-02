@@ -9,25 +9,10 @@ on:
 
 jobs:
   build:
+    runs-on: macos-latest
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
-        include:
-          - os: ubuntu-latest
-            platform: linux
-            extension: ""
-          - os: macos-latest
-            platform: mac
-            extension: ""
-          - os: macos-latest
-            platform: mac
-            extension: ""
-            arch: arm64
-          - os: windows-latest
-            platform: windows
-            extension: ".exe"
-
-    runs-on: ${{ matrix.os }}
+        arch: [x86_64, arm64]
 
     steps:
       - name: Checkout code
@@ -45,18 +30,18 @@ jobs:
 
       - name: Build binary with PyInstaller
         run: |
-          arch=${{ matrix.arch || 'x86_64' }}
-          poetry run pyinstaller --clean --onefile --distpath dist/orion --name orion${{ matrix.extension }} --target-arch $arch orion.spec
-
-      - name: Rename binary
-        if: matrix.os == 'macos-latest'
-        run: |
-          mv dist/orion/orion${{ matrix.extension }} dist/orion/orion_${{ matrix.arch }}
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            arch -arm64 poetry run pyinstaller orion.spec
+          else
+            poetry run pyinstaller orion.spec
+          fi
+          mv dist/orion/orion dist/orion/orion_${{ matrix.arch }}
 
       - name: Upload Release Asset
         uses: softprops/action-gh-release@v1
         with:
-          files: dist/orion/orion*
+          files: dist/orion/orion_${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 

@@ -1,15 +1,9 @@
 # orion.spec
-# This is a basic PyInstaller spec file for the orion_cli project.
-
 import sys
 from PyInstaller.utils.hooks import collect_submodules
 
 # Path to the entry point of your CLI application
 entry_point = "orion_cli/cli.py"
-
-# Determine the platform-specific binary name
-platform = sys.platform
-binary_name = "orion"
 
 # Additional hidden imports, if any
 hidden_imports = collect_submodules('orion_cli.services')
@@ -36,7 +30,7 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name=binary_name,
+    name='orion',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
@@ -56,4 +50,5 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion'
 )
+
 

@@ -27,17 +27,16 @@ jobs:
         poetry install
         poetry add pyinstaller
 
-    - name: Build executable
-      run: poetry run pyinstaller orion_intel.spec
-
-    - name: Rename Linux executable
-      run: mv dist/orion_intel/orion_intel dist/orion_linux
+    - name: Generate spec file and build executable
+      run: |
+        poetry run pyinstaller --name orion_linux --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        mv dist/orion_linux dist/orion_linux_executable
 
     - name: Upload Linux executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_linux
-        path: dist/orion_linux
+        path: dist/orion_linux_executable
 
   build-macos-intel:
     runs-on: macos-13
@@ -59,17 +58,16 @@ jobs:
         poetry install
         poetry add pyinstaller
 
-    - name: Build executable for Intel macOS
-      run: poetry run pyinstaller orion_intel.spec
-
-    - name: Rename Intel macOS executable
-      run: mv dist/orion_intel/orion_intel dist/orion_intel/orion_intel
+    - name: Generate spec file and build executable for Intel macOS
+      run: |
+        poetry run pyinstaller --name orion_intel --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        mv dist/orion_intel dist/orion_intel_executable
 
     - name: Upload Intel macOS executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_intel
-        path: dist/orion_intel/orion_intel
+        path: dist/orion_intel_executable
 
   build-macos-arm:
     runs-on: macos-latest
@@ -92,17 +90,16 @@ jobs:
         poetry install
         poetry add pyinstaller
 
-    - name: Build executable for Apple Silicon macOS
-      run: poetry run pyinstaller orion_arm.spec
-
-    - name: Rename Apple Silicon macOS executable
-      run: mv dist/orion_arm/orion_arm dist/orion_arm/orion_arm
+    - name: Generate spec file and build executable for Apple Silicon macOS
+      run: |
+        poetry run pyinstaller --name orion_arm --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        mv dist/orion_arm dist/orion_arm_executable
 
     - name: Upload Apple Silicon macOS executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_arm
-        path: dist/orion_arm/orion_arm
+        path: dist/orion_arm_executable
 
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm]
@@ -139,6 +136,7 @@ jobs:
           ./release_artifacts/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

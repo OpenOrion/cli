@@ -15,8 +15,10 @@ a = Analysis(
     binaries=[],
     datas=[
         ('orion_cli/services/*.py', 'orion_cli/services'),
-        # Correct path to the Python shared library within the Poetry environment
-        (str(venv_path / 'lib' / 'python3.11' / 'site-packages'), '_internal/Python')
+        # Include the entire lib directory to ensure all necessary files are bundled
+        (str(venv_path / 'lib'), '_internal/Python'),
+        # Include the Python executable
+        (str(venv_path / 'bin' / 'python3.11'), '_internal/Python/bin/python3.11')
     ],
     hiddenimports=[],
     hookspath=[],
@@ -52,4 +54,5 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion_intel'
 )
+
 

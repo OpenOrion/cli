@@ -1,4 +1,4 @@
-# orion.spec
+# orion_arm.spec
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
@@ -15,8 +15,10 @@ a = Analysis(
     binaries=[],
     datas=[
         ('orion_cli/services/*.py', 'orion_cli/services'),
-        # Correct path to the Python shared library within the Poetry environment
-        (str(venv_path / 'lib' / 'python3.11' / 'site-packages'), '_internal/Python')
+        # Include the entire lib directory to ensure all necessary files are bundled
+        (str(venv_path / 'lib'), '_internal/Python'),
+        # Include the Python executable
+        (str(venv_path / 'bin' / 'python3.11'), '_internal/Python/bin/python3.11')
     ],
     hiddenimports=[],
     hookspath=[],
@@ -34,13 +36,12 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='orion',
+    name='orion_arm',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=True,
-    target_arch="universal2",
 )
 
 coll = COLLECT(
@@ -51,8 +52,9 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='orion'
+    name='orion_arm'
 )
+
 
 
 

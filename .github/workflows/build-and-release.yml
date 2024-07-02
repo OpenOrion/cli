@@ -35,7 +35,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: orion_linux
-        path: dist/orion_linux
+        path: dist/orion_linux/orion_linux
 
   build-macos-intel:
     runs-on: macos-13
@@ -65,7 +65,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: orion_intel
-        path: dist/orion_intel
+        path: dist/orion_intel/orion_intel
 
   build-macos-arm:
     runs-on: macos-latest
@@ -96,7 +96,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: orion_arm
-        path: dist/orion_arm
+        path: dist/orion_arm/orion_arm
 
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm]
@@ -128,9 +128,9 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ./release_artifacts/orion_linux/orion_linux
-          ./release_artifacts/orion_intel/orion_intel
-          ./release_artifacts/orion_arm/orion_arm
+          ./release_artifacts/orion_linux
+          ./release_artifacts/orion_intel
+          ./release_artifacts/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

@@ -1,29 +1,24 @@
 # orion.spec
-import sys
-from PyInstaller.utils.hooks import collect_submodules
+# -*- mode: python ; coding: utf-8 -*-
 
-# Path to the entry point of your CLI application
-entry_point = "orion_cli/cli.py"
+block_cipher = None
 
-# Additional hidden imports, if any
-hidden_imports = collect_submodules('orion_cli.services')
-
-# PyInstaller configuration
 a = Analysis(
-    [entry_point],
+    ['orion_cli/cli.py'],
     pathex=['.'],
     binaries=[],
-    datas=[],
-    hiddenimports=hidden_imports,
+    datas=[
+        ('orion_cli/services/*.py', 'orion_cli/services')
+    ],
+    hiddenimports=[],
     hookspath=[],
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
     win_private_assemblies=False,
-    cipher=None,
+    cipher=block_cipher,
 )
-
-pyz = PYZ(a.pure, a.zipped_data, cipher=None)
+pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
     pyz,
@@ -35,8 +30,6 @@ exe = EXE(
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
-    upx_exclude=[],
-    runtime_tmpdir=None,
     console=True,
 )
 

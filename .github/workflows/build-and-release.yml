@@ -30,10 +30,14 @@ jobs:
     - name: Build executable
       run: poetry run pyinstaller orion.spec
 
-    - name: Rename and upload Linux executable
-      run: |
-        mv dist/orion/orion dist/orion/orion_linux
-        gh release upload ${{ github.event.release.tag_name }} dist/orion/orion_linux --repo ${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+    - name: Rename Linux executable
+      run: mv dist/orion/orion dist/orion/orion_linux
+
+    - name: Upload Linux executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_linux
+        path: dist/orion/orion_linux
 
   build-macos-intel:
     runs-on: macos-latest
@@ -59,10 +63,14 @@ jobs:
     - name: Build executable for Intel macOS
       run: poetry run pyinstaller orion_intel.spec
 
-    - name: Rename and upload Intel macOS executable
-      run: |
-        mv dist/orion_intel/orion_intel dist/orion_intel/orion_intel
-        gh release upload ${{ github.event.release.tag_name }} dist/orion_intel/orion_intel --repo ${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+    - name: Rename Intel macOS executable
+      run: mv dist/orion_intel/orion_intel dist/orion_intel/orion_intel
+
+    - name: Upload Intel macOS executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_intel
+        path: dist/orion_intel/orion_intel
 
   build-macos-arm:
     runs-on: macos-latest
@@ -88,10 +96,51 @@ jobs:
     - name: Build executable for Apple Silicon macOS
       run: poetry run pyinstaller orion_arm.spec
 
-    - name: Rename and upload Apple Silicon macOS executable
-      run: |
-        mv dist/orion_arm/orion_arm dist/orion_arm/orion_arm
-        gh release upload ${{ github.event.release.tag_name }} dist/orion_arm/orion_arm --repo ${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
+    - name: Rename Apple Silicon macOS executable
+      run: mv dist/orion_arm/orion_arm dist/orion_arm/orion_arm
+
+    - name: Upload Apple Silicon macOS executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_arm
+        path: dist/orion_arm/orion_arm
+
+  release:
+    needs: [build-linux, build-macos-intel, build-macos-arm]
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Download Linux artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_linux
+        path: ./release_artifacts
+
+    - name: Download Intel macOS artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_intel
+        path: ./release_artifacts
+
+    - name: Download Apple Silicon macOS artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_arm
+        path: ./release_artifacts
+
+    - name: Upload to GitHub Releases
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          ./release_artifacts/orion_linux
+          ./release_artifacts/orion_intel
+          ./release_artifacts/orion_arm
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

@@ -1,7 +1,13 @@
 # orion_arm.spec
 # -*- mode: python ; coding: utf-8 -*-
 
+import sys
+from pathlib import Path
+
 block_cipher = None
+
+# Determine the virtual environment path dynamically
+venv_path = Path(sys.prefix)
 
 a = Analysis(
     ['orion_cli/cli.py'],
@@ -9,9 +15,8 @@ a = Analysis(
     binaries=[],
     datas=[
         ('orion_cli/services/*.py', 'orion_cli/services'),
-        # Include Python shared library and other required files
-        ('/path/to/python/library/dylib', '_internal/Python'),
-        ('/path/to/other/required/files', '_internal')
+        # Correct path to the Python shared library within the Poetry environment
+        (str(venv_path / 'lib' / 'python3.11' / 'site-packages'), '_internal/Python')
     ],
     hiddenimports=[],
     hookspath=[],
@@ -21,6 +26,7 @@ a = Analysis(
     win_private_assemblies=False,
     cipher=block_cipher,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -46,4 +52,5 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion_arm'
 )
+
 

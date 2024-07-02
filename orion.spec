@@ -31,6 +31,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
+    target_arch="universal2",  # Add this line to specify universal architecture
 )
 
 coll = COLLECT(

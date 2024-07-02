@@ -25,15 +25,26 @@ jobs:
 
       - name: Install dependencies
         run: |
-          curl -sSL https://install.python-poetry.org | python3 -
-          poetry install
+          if [ "${{ matrix.arch }}" == "arm64" ]; then
+            arch -arm64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            arch -arm64 brew install python@3.11
+            arch -arm64 curl -sSL https://install.python-poetry.org | python3 -
+            arch -arm64 poetry env use /opt/homebrew/bin/python3.11
+            arch -arm64 poetry install
+          else
+            arch -x86_64 /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+            arch -x86_64 brew install python@3.11
+            arch -x86_64 curl -sSL https://install.python-poetry.org | python3 -
+            arch -x86_64 poetry env use /usr/local/bin/python3.11
+            arch -x86_64 poetry install
+          fi
 
       - name: Build binary with PyInstaller
         run: |
           if [ "${{ matrix.arch }}" == "arm64" ]; then
-            arch -arm64 poetry run pyinstaller orion.spec
+            arch -arm64 poetry run pyinstaller --onefile --distpath dist/orion --name orion orion.spec
           else
-            arch -x86_64 poetry run pyinstaller orion.spec
+            arch -x86_64 poetry run pyinstaller --onefile --distpath dist/orion --name orion orion.spec
           fi
           mv dist/orion/orion dist/orion/orion_${{ matrix.arch }}
 
@@ -43,6 +54,7 @@ jobs:
           files: dist/orion/orion_${{ matrix.arch }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

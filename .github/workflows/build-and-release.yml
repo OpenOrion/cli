@@ -31,16 +31,16 @@ jobs:
       run: poetry run pyinstaller orion.spec
 
     - name: Rename Linux executable
-      run: mv dist/orion/orion dist/orion/orion_linux
+      run: mv dist/orion/orion dist/orion_linux
 
     - name: Upload Linux executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_linux
-        path: dist/orion/orion_linux
+        path: dist/orion_linux
 
   build-macos-intel:
-    runs-on: macos-latest
+    runs-on: macos-13
 
     steps:
     - name: Checkout code
@@ -140,6 +140,7 @@ jobs:
           ./release_artifacts/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

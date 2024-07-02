@@ -31,6 +31,10 @@ jobs:
       run: |
         poetry run pyinstaller --name orion_linux --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
+    - name: List directory contents
+      run: |
+        ls -R dist/orion_linux
+
     - name: Upload Linux executable
       uses: actions/upload-artifact@v2
       with:
@@ -60,6 +64,10 @@ jobs:
     - name: Generate spec file and build executable for Intel macOS
       run: |
         poetry run pyinstaller --name orion_intel --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+
+    - name: List directory contents
+      run: |
+        ls -R dist/orion_intel
 
     - name: Upload Intel macOS executable
       uses: actions/upload-artifact@v2
@@ -92,6 +100,10 @@ jobs:
       run: |
         poetry run pyinstaller --name orion_arm --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
+    - name: List directory contents
+      run: |
+        ls -R dist/orion_arm
+
     - name: Upload Apple Silicon macOS executable
       uses: actions/upload-artifact@v2
       with:
@@ -110,19 +122,23 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: orion_linux
-        path: ./release_artifacts
+        path: ./release_artifacts/orion_linux
 
     - name: Download Intel macOS artifact
       uses: actions/download-artifact@v2
       with:
         name: orion_intel
-        path: ./release_artifacts
+        path: ./release_artifacts/orion_intel
 
     - name: Download Apple Silicon macOS artifact
       uses: actions/download-artifact@v2
       with:
         name: orion_arm
-        path: ./release_artifacts
+        path: ./release_artifacts/orion_arm
+
+    - name: List downloaded artifacts
+      run: |
+        ls -R ./release_artifacts
 
     - name: Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
@@ -133,6 +149,7 @@ jobs:
           ./release_artifacts/orion_arm/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

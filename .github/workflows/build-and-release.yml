@@ -30,13 +30,10 @@ jobs:
     - name: Build executable
       run: poetry run pyinstaller orion.spec
 
-    - name: Upload to GitHub Releases
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/orion/orion
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Rename and upload Linux executable
+      run: |
+        mv dist/orion/orion dist/orion/orion_linux
+        gh release upload ${{ github.event.release.tag_name }} dist/orion/orion_linux --repo ${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
 
   build-macos-intel:
     runs-on: macos-latest
@@ -62,16 +59,10 @@ jobs:
     - name: Build executable for Intel macOS
       run: poetry run pyinstaller orion_intel.spec
 
-    - name: Rename executable for Intel macOS
-      run: mv dist/orion_intel/orion_intel dist/orion_intel/orion
-
-    - name: Upload to GitHub Releases
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/orion_intel/orion
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    - name: Rename and upload Intel macOS executable
+      run: |
+        mv dist/orion_intel/orion_intel dist/orion_intel/orion_intel
+        gh release upload ${{ github.event.release.tag_name }} dist/orion_intel/orion_intel --repo ${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
 
   build-macos-arm:
     runs-on: macos-latest
@@ -97,16 +88,11 @@ jobs:
     - name: Build executable for Apple Silicon macOS
       run: poetry run pyinstaller orion_arm.spec
 
-    - name: Rename executable for Apple Silicon macOS
-      run: mv dist/orion_arm/orion_arm dist/orion_arm/orion
+    - name: Rename and upload Apple Silicon macOS executable
+      run: |
+        mv dist/orion_arm/orion_arm dist/orion_arm/orion_arm
+        gh release upload ${{ github.event.release.tag_name }} dist/orion_arm/orion_arm --repo ${{ github.repository }} --token ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Upload to GitHub Releases
-      uses: softprops/action-gh-release@v1
-      with:
-        files: |
-          dist/orion_arm/orion
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
 
 

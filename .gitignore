@@ -12,7 +12,7 @@ venv
 # Additional entries
 
 # Distribution / packaging
-dist/
+dist/orion/*
 build/
 
 # Virtual environment

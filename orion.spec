@@ -8,7 +8,10 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        ('orion_cli/services/*.py', 'orion_cli/services')
+        ('orion_cli/services/*.py', 'orion_cli/services'),
+        # Include Python shared library and other required files
+        ('/path/to/python/library/dylib', '_internal/Python'),
+        ('/path/to/other/required/files', '_internal')
     ],
     hiddenimports=[],
     hookspath=[],
@@ -18,6 +21,7 @@ a = Analysis(
     win_private_assemblies=False,
     cipher=block_cipher,
 )
+
 pyz = PYZ(a.pure, a.zipped_data, cipher=block_cipher)
 
 exe = EXE(
@@ -31,7 +35,7 @@ exe = EXE(
     strip=False,
     upx=True,
     console=True,
-    target_arch="universal2",  # Add this line to specify universal architecture
+    target_arch="universal2",  # Specify universal architecture
 )
 
 coll = COLLECT(

@@ -8,7 +8,10 @@ a = Analysis(
     pathex=['.'],
     binaries=[],
     datas=[
-        ('orion_cli/services/*.py', 'orion_cli/services')
+        ('orion_cli/services/*.py', 'orion_cli/services'),
+        # Include Python shared library and other required files
+        ('/path/to/python/library/dylib', '_internal/Python'),
+        ('/path/to/other/required/files', '_internal')
     ],
     hiddenimports=[],
     hookspath=[],
@@ -43,3 +46,4 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion_arm'
 )
+

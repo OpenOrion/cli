@@ -38,6 +38,8 @@ coll = COLLECT(
     a.binaries,
     a.zipfiles,
     a.datas,
+    [('path/to/python/library/dylib', '.'),  # Include Python shared library
+     ('path/to/other/required/files', '.')],  # Include other required files
     strip=False,
     upx=True,
     upx_exclude=[],

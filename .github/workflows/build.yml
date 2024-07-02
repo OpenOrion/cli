@@ -47,9 +47,9 @@ jobs:
         uses: actions/download-artifact@v2
         with:
           name: orion
-          path: dist/orion
 
       - name: Create GitHub Release
+        id: create_release
         uses: actions/create-release@v1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -60,5 +60,12 @@ jobs:
             Release notes for version ${{ github.ref }}.
           draft: false
           prerelease: false
-          files: dist/orion/orion  # Ensure this path matches the actual file location
+
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: dist/orion/orion
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 

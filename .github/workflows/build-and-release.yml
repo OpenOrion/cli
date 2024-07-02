@@ -62,8 +62,11 @@ jobs:
     - name: Build executable for Intel macOS
       run: poetry run pyinstaller orion_intel.spec
 
+    - name: Check built files for Intel macOS
+      run: ls -R dist/orion_intel
+
     - name: Rename executable for Intel macOS
-      run: mv dist/orion_intel/orion_intel dist/orion/orion_intel
+      run: mv dist/orion_intel/orion dist/orion/orion_intel
 
     - name: Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
@@ -97,8 +100,11 @@ jobs:
     - name: Build executable for Apple Silicon macOS
       run: poetry run pyinstaller orion_arm.spec
 
+    - name: Check built files for Apple Silicon macOS
+      run: ls -R dist/orion_arm
+
     - name: Rename executable for Apple Silicon macOS
-      run: mv dist/orion_arm/orion_arm dist/orion/orion_arm
+      run: mv dist/orion_arm/orion dist/orion/orion_arm
 
     - name: Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
@@ -107,6 +113,7 @@ jobs:
           dist/orion/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

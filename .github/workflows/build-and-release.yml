@@ -30,13 +30,12 @@ jobs:
     - name: Generate spec file and build executable
       run: |
         poetry run pyinstaller --name orion_linux --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
-        mv dist/orion_linux dist/orion_linux_executable
 
     - name: Upload Linux executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_linux
-        path: dist/orion_linux_executable
+        path: dist/orion_linux
 
   build-macos-intel:
     runs-on: macos-13
@@ -61,13 +60,12 @@ jobs:
     - name: Generate spec file and build executable for Intel macOS
       run: |
         poetry run pyinstaller --name orion_intel --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
-        mv dist/orion_intel dist/orion_intel_executable
 
     - name: Upload Intel macOS executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_intel
-        path: dist/orion_intel_executable
+        path: dist/orion_intel
 
   build-macos-arm:
     runs-on: macos-latest
@@ -93,13 +91,12 @@ jobs:
     - name: Generate spec file and build executable for Apple Silicon macOS
       run: |
         poetry run pyinstaller --name orion_arm --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
-        mv dist/orion_arm dist/orion_arm_executable
 
     - name: Upload Apple Silicon macOS executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_arm
-        path: dist/orion_arm_executable
+        path: dist/orion_arm
 
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm]
@@ -131,11 +128,12 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ./release_artifacts/orion_linux
-          ./release_artifacts/orion_intel
-          ./release_artifacts/orion_arm
+          ./release_artifacts/orion_linux/orion_linux
+          ./release_artifacts/orion_intel/orion_intel
+          ./release_artifacts/orion_arm/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

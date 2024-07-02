@@ -21,7 +21,7 @@ a = Analysis(
         (str(venv_path / 'bin' / 'python3.11'), '_internal/Python/bin/python3.11')
     ],
     hiddenimports=[],
-    hookspath=[],
+    hookspath=['hooks'],
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
@@ -54,6 +54,7 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion_arm'
 )
+
 
 
 

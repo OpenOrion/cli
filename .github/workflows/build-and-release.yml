@@ -28,10 +28,10 @@ jobs:
         poetry add pyinstaller
 
     - name: Build executable
-      run: poetry run pyinstaller orion.spec
+      run: poetry run pyinstaller orion_intel.spec
 
     - name: Rename Linux executable
-      run: mv dist/orion/orion dist/orion_linux
+      run: mv dist/orion_intel/orion_intel dist/orion_linux
 
     - name: Upload Linux executable
       uses: actions/upload-artifact@v2
@@ -139,6 +139,7 @@ jobs:
           ./release_artifacts/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

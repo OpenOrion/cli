@@ -17,11 +17,9 @@ a = Analysis(
         ('orion_cli/services/*.py', 'orion_cli/services'),
         # Include the entire lib directory to ensure all necessary files are bundled
         (str(venv_path / 'lib'), '_internal/Python'),
-        # Include the Python executable
-        (str(venv_path / 'bin' / 'python3.11'), '_internal/Python/bin/python3.11')
     ],
     hiddenimports=[],
-    hookspath=[],
+    hookspath=['hooks'],
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
@@ -54,5 +52,6 @@ coll = COLLECT(
     upx_exclude=[],
     name='orion_intel'
 )
+
 
 

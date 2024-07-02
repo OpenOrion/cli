@@ -1,4 +1,4 @@
-# orion_arm.spec
+# orion.spec
 # -*- mode: python ; coding: utf-8 -*-
 
 import sys
@@ -21,7 +21,7 @@ a = Analysis(
         (str(venv_path / 'bin' / 'python3.11'), '_internal/Python/bin/python3.11')
     ],
     hiddenimports=[],
-    hookspath=[],
+    hookspath=['hooks'],
     runtime_hooks=[],
     excludes=[],
     win_no_prefer_redirects=False,
@@ -36,12 +36,13 @@ exe = EXE(
     a.scripts,
     [],
     exclude_binaries=True,
-    name='orion_arm',
+    name='orion',
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,
     upx=True,
     console=True,
+    target_arch="universal2",
 )
 
 coll = COLLECT(
@@ -52,8 +53,9 @@ coll = COLLECT(
     strip=False,
     upx=True,
     upx_exclude=[],
-    name='orion_arm'
+    name='orion'
 )
+
 
 
 

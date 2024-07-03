@@ -66,12 +66,12 @@ jobs:
       with:
         name: orion_intel
         path: dist/orion_intel
-        
+
     - name: Upload PyInstaller spec file
       uses: actions/upload-artifact@v2
       with:
         name: pyinstaller-spec-file
-        path: orion_cli/orion_intel.spec
+        path: orion_intel.spec
 
   build-macos-arm:
     runs-on: macos-latest

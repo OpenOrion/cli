@@ -35,7 +35,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: orion_linux
-        path: dist/orion_linux
+        path: dist/orion_linux/orion_linux
 
   build-macos-intel:
     runs-on: macos-13
@@ -65,7 +65,7 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: orion_intel
-        path: dist/orion_intel
+        path: dist/orion_intel/orion_intel
 
   build-macos-arm:
     runs-on: macos-latest
@@ -96,10 +96,41 @@ jobs:
       uses: actions/upload-artifact@v2
       with:
         name: orion_arm
-        path: dist/orion_arm
+        path: dist/orion_arm/orion_arm
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+
+    - name: Install dependencies
+      run: |
+        poetry install
+        poetry add pyinstaller
+
+    - name: Generate spec file and build executable
+      run: |
+        poetry run pyinstaller --name orion_win --onefile --add-data "orion_cli/services/*.py;orion_cli/services" orion_cli/cli.py
+
+    - name: Upload Windows executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_win
+        path: dist/orion_win/orion_win.exe
 
   release:
-    needs: [build-linux, build-macos-intel, build-macos-arm]
+    needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]
     runs-on: ubuntu-latest
 
     steps:
@@ -110,19 +141,25 @@ jobs:
       uses: actions/download-artifact@v2
       with:
         name: orion_linux
-        path: ./release_artifacts/orion_linux
+        path: ./release_artifacts
 
     - name: Download Intel macOS artifact
       uses: actions/download-artifact@v2
       with:
         name: orion_intel
-        path: ./release_artifacts/orion_intel
+        path: ./release_artifacts
 
     - name: Download Apple Silicon macOS artifact
       uses: actions/download-artifact@v2
       with:
         name: orion_arm
-        path: ./release_artifacts/orion_arm
+        path: ./release_artifacts
+
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_win
+        path: ./release_artifacts
 
     - name: Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
@@ -131,8 +168,10 @@ jobs:
           ./release_artifacts/orion_linux/orion_linux
           ./release_artifacts/orion_intel/orion_intel
           ./release_artifacts/orion_arm/orion_arm
+          ./release_artifacts/orion_win/orion_win.exe
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
 
 
 

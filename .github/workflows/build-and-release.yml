@@ -97,6 +97,36 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      uses: snok/install-poetry@v1
+
+    - name: Install dependencies
+      run: |
+        poetry install
+        poetry add pyinstaller
+
+    - name: Generate spec file and build executable
+      run: |
+        poetry run pyinstaller --name orion_win --onefile --add-data "orion_cli/services/*.py;orion_cli/services" orion_cli/cli.py
+
+    - name: Upload Windows executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_win
+        path: dist/orion_win/orion_win.exe
+
 
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm]

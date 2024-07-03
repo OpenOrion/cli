@@ -59,14 +59,14 @@ jobs:
 
     - name: Generate initial spec file and build executable
       run: |
-        poetry run pyinstaller --name orion_intel --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
-    
+        poetry run pyinstaller --name orion_intel --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+
     - name: Modify spec file
       run: |
         sed -i '' 's/optimize=0/optimize=2/' orion_intel.spec
         sed -i '' 's/strip=False/strip=True/' orion_intel.spec
         sed -i '' 's/upx=True/upx=False/' orion_intel.spec
-  
+
     - name: Rebuild executable using modified spec file
       run: |
         poetry run pyinstaller orion_intel.spec
@@ -82,6 +82,7 @@ jobs:
       with:
         name: pyinstaller-spec-file
         path: orion_intel.spec
+
 
   build-macos-arm:
     runs-on: macos-latest

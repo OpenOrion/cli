@@ -57,21 +57,23 @@ jobs:
         poetry install
         poetry add pyinstaller
 
-    - name: Build executable using provided spec file
+    - name: Build executable as directory
       run: |
-        poetry run pyinstaller orion_intel.spec
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
-    - name: Upload Intel macOS executable
+    - name: Rename output directory
+      run: |
+        mv dist/orion dist/orion_intel
+
+    - name: Zip the output directory
+      run: |
+        cd dist && zip -r orion_intel.zip orion_intel
+
+    - name: Upload zipped executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_intel
-        path: dist/orion_intel
-
-    - name: Upload PyInstaller spec file
-      uses: actions/upload-artifact@v2
-      with:
-        name: pyinstaller-spec-file
-        path: orion_intel.spec
+        path: dist/orion_intel.zip
 
 
   build-macos-arm:

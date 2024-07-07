@@ -27,15 +27,24 @@ jobs:
         poetry install
         poetry add pyinstaller
 
-    - name: Generate spec file and build executable
+    - name: Build executable as directory for Linux
       run: |
-        poetry run pyinstaller --name orion_linux --onefile --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
-    - name: Upload Linux executable
+    - name: Rename output directory
+      run: |
+        mv dist/orion dist/orion_linux
+
+    - name: Zip the output directory
+      run: |
+        cd dist && zip -r orion_linux.zip orion_linux
+
+    - name: Upload zipped executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_linux
-        path: dist/orion_linux
+        path: dist/orion_linux.zip
+
 
   build-macos-intel:
     runs-on: macos-13
@@ -115,7 +124,6 @@ jobs:
         name: orion_arm
         path: dist/orion_arm.zip
 
-
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm]
     runs-on: ubuntu-latest
@@ -146,11 +154,12 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          ./release_artifacts/orion_linux/orion_linux
+          ./release_artifacts/orion_linux/orion_linux.zip
           ./release_artifacts/orion_intel/orion_intel.zip
           ./release_artifacts/orion_arm/orion_arm.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
 
 
 

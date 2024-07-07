@@ -124,8 +124,47 @@ jobs:
         name: orion_arm
         path: dist/orion_arm.zip
 
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v2
+
+    - name: Set up Python
+      uses: actions/setup-python@v2
+      with:
+        python-version: '3.11'
+
+    - name: Install Poetry
+      run: |
+        (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+
+    - name: Install dependencies
+      run: |
+        poetry install
+        poetry add pyinstaller
+
+    - name: Build executable as directory for Windows
+      run: |
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py;orion_cli/services" orion_cli/cli.py
+
+    - name: Rename output directory
+      run: |
+        Rename-Item -Path dist\orion -NewName orion_windows
+
+    - name: Zip the output directory
+      run: |
+        Compress-Archive -Path dist\orion_windows -DestinationPath dist\orion_windows.zip
+
+    - name: Upload zipped executable
+      uses: actions/upload-artifact@v2
+      with:
+        name: orion_windows
+        path: dist\orion_windows.zip
+
   release:
-    needs: [build-linux, build-macos-intel, build-macos-arm]
+    needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]
     runs-on: ubuntu-latest
 
     steps:
@@ -150,6 +189,12 @@ jobs:
         name: orion_arm
         path: ./release_artifacts/orion_arm
 
+    - name: Download Windows artifact
+      uses: actions/download-artifact@v2
+      with:
+        name: orion_windows
+        path: ./release_artifacts/orion_windows
+
     - name: Upload to GitHub Releases
       uses: softprops/action-gh-release@v1
       with:
@@ -157,6 +202,7 @@ jobs:
           ./release_artifacts/orion_linux/orion_linux.zip
           ./release_artifacts/orion_intel/orion_intel.zip
           ./release_artifacts/orion_arm/orion_arm.zip
+          ./release_artifacts/orion_windows/orion_windows.zip
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       

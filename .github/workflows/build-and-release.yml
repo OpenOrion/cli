@@ -136,7 +136,7 @@ jobs:
       with:
         files: |
           ./release_artifacts/orion_linux/orion_linux
-          ./release_artifacts/orion_intel/orion_intel
+          ./release_artifacts/orion_intel/orion_intel.zip
           ./release_artifacts/orion_arm/orion_arm
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

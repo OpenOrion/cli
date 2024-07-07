@@ -143,20 +143,20 @@ jobs:
 
     - name: Add Poetry to PATH
       run: |
-        $env:PATH += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
-        [Environment]::SetEnvironmentVariable("PATH", $env:PATH, [EnvironmentVariableTarget]::Process)
-        poetry --version
+        $env:Path += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
+        [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Process)
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry --version
       shell: powershell
 
     - name: Install dependencies
       run: |
-        poetry install
-        poetry add pyinstaller
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry add pyinstaller
       shell: powershell
 
     - name: Build executable as directory for Windows
       run: |
-        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py;orion_cli/services" orion_cli/cli.py
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py;orion_cli/services" orion_cli/cli.py
       shell: powershell
 
     - name: Rename output directory
@@ -174,6 +174,7 @@ jobs:
       with:
         name: orion_windows
         path: dist\orion_windows.zip
+
 
 
   release:

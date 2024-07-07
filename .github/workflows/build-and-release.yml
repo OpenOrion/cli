@@ -139,29 +139,42 @@ jobs:
     - name: Install Poetry
       run: |
         (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+      shell: powershell
+
+    - name: Add Poetry to PATH
+      run: |
+        $env:PATH += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
+        [Environment]::SetEnvironmentVariable("PATH", $env:PATH, [EnvironmentVariableTarget]::Process)
+        poetry --version
+      shell: powershell
 
     - name: Install dependencies
       run: |
         poetry install
         poetry add pyinstaller
+      shell: powershell
 
     - name: Build executable as directory for Windows
       run: |
         poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py;orion_cli/services" orion_cli/cli.py
+      shell: powershell
 
     - name: Rename output directory
       run: |
         Rename-Item -Path dist\orion -NewName orion_windows
+      shell: powershell
 
     - name: Zip the output directory
       run: |
         Compress-Archive -Path dist\orion_windows -DestinationPath dist\orion_windows.zip
+      shell: powershell
 
     - name: Upload zipped executable
       uses: actions/upload-artifact@v2
       with:
         name: orion_windows
         path: dist\orion_windows.zip
+
 
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]

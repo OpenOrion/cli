@@ -103,11 +103,17 @@ jobs:
         auto-activate-base: true
         activate-environment: ""
 
+    - name: Check conda installation path
+      shell: bash
+      run: |
+        which conda
+        conda info
+
     - name: Create and activate conda environment
       shell: bash
       run: |
         conda create -n cq python=3.11 -y
-        source ~/miniconda/etc/profile.d/conda.sh
+        source $(conda info --base)/etc/profile.d/conda.sh
         conda activate cq
         conda install mamba -n base -c conda-forge
         mamba install -c conda-forge cadquery -y
@@ -120,7 +126,7 @@ jobs:
     - name: Install dependencies
       shell: bash
       run: |
-        source ~/miniconda/etc/profile.d/conda.sh
+        source $(conda info --base)/etc/profile.d/conda.sh
         conda activate cq
         poetry install
         poetry add pyinstaller
@@ -128,7 +134,7 @@ jobs:
     - name: Build executable as directory for Apple Silicon macOS
       shell: bash
       run: |
-        source ~/miniconda/etc/profile.d/conda.sh
+        source $(conda info --base)/etc/profile.d/conda.sh
         conda activate cq
         poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
@@ -147,7 +153,6 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
-
 
 
   build-windows:

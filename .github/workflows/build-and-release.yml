@@ -97,19 +97,17 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Install Miniconda
-      shell: bash
-      run: |
-        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -O miniconda.sh
-        bash miniconda.sh -b -p $HOME/miniconda
-        eval "$($HOME/miniconda/bin/conda shell.bash hook)"
-        conda init
-        source ~/.bashrc
+    - name: Set up Miniconda
+      uses: conda-incubator/setup-miniconda@v3
+      with:
+        auto-activate-base: true
+        activate-environment: ""
 
     - name: Create and activate conda environment
       shell: bash
       run: |
         conda create -n cq python=3.11 -y
+        source ~/miniconda/etc/profile.d/conda.sh
         conda activate cq
         conda install mamba -n base -c conda-forge
         mamba install -c conda-forge cadquery -y
@@ -122,6 +120,7 @@ jobs:
     - name: Install dependencies
       shell: bash
       run: |
+        source ~/miniconda/etc/profile.d/conda.sh
         conda activate cq
         poetry install
         poetry add pyinstaller
@@ -129,6 +128,7 @@ jobs:
     - name: Build executable as directory for Apple Silicon macOS
       shell: bash
       run: |
+        source ~/miniconda/etc/profile.d/conda.sh
         conda activate cq
         poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
@@ -147,6 +147,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
   build-windows:

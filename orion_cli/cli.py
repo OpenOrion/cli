@@ -67,5 +67,19 @@ def sync_command(project_path):
     service = SyncService()
     service.sync(project_path)
 
+@cli.command(name="test_cadquery")
+def test_cadquery_command():
+    """Test CadQuery by creating and displaying a basic shape"""
+    import cadquery as cq
+    from cadquery import exporters
+
+    # Create a simple box shape
+    box = cq.Workplane("front").box(1, 2, 3)
+
+    # Export the shape to an STL file
+    exporters.export(box, 'test_shape.stl')
+
+    click.echo("CadQuery test shape created and saved as 'test_shape.stl'")
+
 if __name__ == "__main__":
     cli()

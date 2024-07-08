@@ -97,24 +97,48 @@ jobs:
       with:
         python-version: '3.11'
 
+    - name: Install Miniconda
+      shell: bash
+      run: |
+        wget https://repo.anaconda.com/miniconda/Miniconda3-latest-MacOSX-arm64.sh -O miniconda.sh
+        bash miniconda.sh -b -p $HOME/miniconda
+        eval "$($HOME/miniconda/bin/conda shell.bash hook)"
+        conda init
+        source ~/.bashrc
+
+    - name: Create and activate conda environment
+      shell: bash
+      run: |
+        conda create -n cq python=3.11 -y
+        conda activate cq
+        conda install mamba -n base -c conda-forge
+        mamba install -c conda-forge cadquery -y
+
     - name: Install Poetry
+      shell: bash
       run: |
         curl -sSL https://install.python-poetry.org | python3 -
 
     - name: Install dependencies
+      shell: bash
       run: |
+        conda activate cq
         poetry install
         poetry add pyinstaller
 
     - name: Build executable as directory for Apple Silicon macOS
+      shell: bash
       run: |
+        conda activate cq
         poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
     - name: Rename output directory
+      shell: bash
       run: |
         mv dist/orion dist/orion_arm
 
     - name: Zip the output directory
+      shell: bash
       run: |
         cd dist && zip -r orion_arm.zip orion_arm
 
@@ -123,6 +147,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
   build-windows:
     runs-on: windows-latest
@@ -174,8 +199,6 @@ jobs:
       with:
         name: orion_windows
         path: dist\orion_windows.zip
-
-
 
   release:
     needs: [build-linux, build-macos-intel, build-macos-arm, build-windows]

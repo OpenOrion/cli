@@ -129,10 +129,12 @@ jobs:
         mamba install -y pyinstaller
 
     - name: Generate PyInstaller command
+      id: pyinstaller_cmd
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
-        pyinstaller --name orion --onedir --paths=$CONDA_PREFIX/lib/python3.11/site-packages --add-data "$CONDA_PREFIX:lib/orion-env" orion_cli/cli.py
+        pyinstaller --name orion --onedir --add-data "$CONDA_PREFIX:lib/orion-env" orion_cli/cli.py
+        echo "PyInstaller command executed."
 
     - name: Rename output directory
       run: |
@@ -147,7 +149,6 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
-
 
 
 

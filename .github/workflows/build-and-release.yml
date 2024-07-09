@@ -136,7 +136,7 @@ jobs:
       id: pyinstaller_cmd
       run: |
         INSTALL_PATH=$(python -c "import site; print(site.getsitepackages()[0])")
-        CMD="pyinstaller --name orion --onedir --add-data 'orion_cli/services/*.py:orion_cli/services'"
+        CMD="pyinstaller --name orion --onedir --add-data 'orion_cli/services/*.py:orion_cli/services' --paths=$INSTALL_PATH"
         while IFS= read -r line; do
           PACKAGE=$(echo $line | cut -d '=' -f 1)
           CMD="$CMD --copy-metadata $PACKAGE --collect-all $PACKAGE"
@@ -163,6 +163,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
 

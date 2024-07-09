@@ -103,12 +103,6 @@ jobs:
         auto-activate-base: true
         activate-environment: ""
 
-    - name: Check conda installation path
-      shell: bash
-      run: |
-        which conda
-        conda info
-
     - name: Create and activate conda environment
       shell: bash
       run: |
@@ -136,7 +130,7 @@ jobs:
       run: |
         source $(conda info --base)/etc/profile.d/conda.sh
         conda activate cq
-        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        poetry run pyinstaller orion.spec
 
     - name: Rename output directory
       shell: bash
@@ -153,6 +147,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
   build-windows:

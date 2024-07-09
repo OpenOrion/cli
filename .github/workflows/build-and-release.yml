@@ -104,6 +104,8 @@ jobs:
       run: |
         poetry export -f requirements.txt --output requirements.txt --without-hashes
         sed '/; python_version/ s/; python_version.*//' requirements.txt > requirements.txt
+        echo "Contents of requirements.txt:"
+        cat requirements.txt
 
     - name: Install Miniforge and Mamba
       run: |
@@ -132,16 +134,18 @@ jobs:
         conda activate orion-env
         python -m pip list --format=freeze > installed-packages.txt
 
-    - name: Print Conda environment paths
+    - name: Print Conda environment paths and info
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
         echo "Conda Environment Paths:"
         conda info --envs
+        echo "Conda Environment Info:"
+        conda list
         echo "Site-packages directory:"
         python -c "import site; print(site.getsitepackages())"
-        echo "List of all packages in site-packages:"
-        ls -l $(python -c "import site; print(site.getsitepackages()[0])")
+        echo "List of all files in site-packages:"
+        ls -lR $(python -c "import site; print(site.getsitepackages()[0])")
         echo "List of dynamic libraries in the Conda environment:"
         find $CONDA_PREFIX/lib -name "*.dylib"
         echo "List of all shared objects in site-packages:"
@@ -159,6 +163,7 @@ jobs:
           CMD="$CMD --copy-metadata $PACKAGE --collect-all $PACKAGE"
         done < installed-packages.txt
         CMD="$CMD orion_cli/cli.py"
+        echo "PyInstaller command: $CMD"
         echo "COMMAND=$CMD" >> $GITHUB_ENV
 
     - name: Build executable as directory for Apple Silicon macOS
@@ -180,6 +185,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
 

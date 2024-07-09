@@ -92,18 +92,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
 
-    - name: Set up Python
-      uses: actions/setup-python@v2
-      with:
-        python-version: '3.11'
-
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
     - name: Export dependencies to requirements.txt
       run: |
         poetry export -f requirements.txt --output requirements.txt --without-hashes
-        sed '/; python_version/ s/; python_version.*//' requirements.txt > requirements.txt
+        sed '/; python_version/ s/; python_version.*//' requirements.txt > filtered-requirements.txt
 
     - name: Install Miniforge and Mamba
       run: |
@@ -123,14 +118,14 @@ jobs:
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
-        mamba install -y --file requirements.txt
+        mamba install -y --file filtered-requirements.txt
         mamba install -y pyinstaller
 
     - name: Build executable as directory for Apple Silicon macOS
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
-        pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        pyinstaller --name orion --onedir --paths=$CONDA_PREFIX/lib/python3.11/site-packages --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
     - name: Rename output directory
       run: |

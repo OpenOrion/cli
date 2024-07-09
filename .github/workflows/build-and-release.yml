@@ -102,7 +102,8 @@ jobs:
 
     - name: Create simplified requirements.txt from pyproject.toml
       run: |
-        awk '/\[tool.poetry.dependencies\]/,/\[tool.poetry.dev-dependencies\]/ {if ($1 != "python" && $1 != "[tool.poetry.dependencies]" && $1 != "[tool.poetry.dev-dependencies]") print}' pyproject.toml | sed 's/ = /==/g' > requirements.txt
+        awk '/\[tool.poetry.dependencies\]/,/\[tool.poetry.dev-dependencies\]/ {if ($1 != "python" && $1 != "[tool.poetry.dependencies]" && $1 != "[tool.poetry.dev-dependencies]") print}' pyproject.toml | \
+        sed 's/ = "/==/g' | sed 's/[",^]//g' | sed 's/ *$//' > requirements.txt
         echo "Contents of requirements.txt:"
         cat requirements.txt
 
@@ -186,6 +187,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
 

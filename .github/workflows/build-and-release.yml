@@ -132,11 +132,28 @@ jobs:
         conda activate orion-env
         python -m pip list --format=freeze > installed-packages.txt
 
+    - name: Print Conda environment paths
+      run: |
+        source ~/miniforge3/etc/profile.d/conda.sh
+        conda activate orion-env
+        echo "Conda Environment Paths:"
+        conda info --envs
+        echo "Site-packages directory:"
+        python -c "import site; print(site.getsitepackages())"
+        echo "List of all packages in site-packages:"
+        ls -l $(python -c "import site; print(site.getsitepackages()[0])")
+        echo "List of dynamic libraries in the Conda environment:"
+        find $CONDA_PREFIX/lib -name "*.dylib"
+        echo "List of all shared objects in site-packages:"
+        find $(python -c "import site; print(site.getsitepackages()[0])") -name "*.so"
+        echo "PyInstaller hook directory:"
+        ls -l $CONDA_PREFIX/lib/python3.11/site-packages/_pyinstaller_hooks_contrib/hooks/stdhooks
+
     - name: Generate PyInstaller command
       id: pyinstaller_cmd
       run: |
         INSTALL_PATH=$(python -c "import site; print(site.getsitepackages()[0])")
-        CMD="pyinstaller --name orion --onedir --add-data 'orion_cli/services/*.py:orion_cli/services' --paths=$INSTALL_PATH"
+        CMD="pyinstaller --name orion --onedir --add-data 'orion_cli/services/*.py:orion_cli/services'"
         while IFS= read -r line; do
           PACKAGE=$(echo $line | cut -d '=' -f 1)
           CMD="$CMD --copy-metadata $PACKAGE --collect-all $PACKAGE"
@@ -163,6 +180,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
 

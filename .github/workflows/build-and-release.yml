@@ -100,9 +100,20 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
+    - name: Download cadquery_ocp wheel
+      run: |
+        curl -L -o cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl
+
+    - name: Install cadquery_ocp wheel
+      run: |
+        pip install cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl
+
     - name: Install dependencies
       run: |
-        poetry install
+        poetry install --no-root
+
+    - name: Add pyinstaller
+      run: |
         poetry add pyinstaller
 
     - name: Build executable as directory for Apple Silicon macOS

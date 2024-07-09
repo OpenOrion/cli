@@ -102,24 +102,7 @@ jobs:
 
     - name: Create simplified requirements.txt from pyproject.toml
       run: |
-        python - <<EOF
-        import toml
-
-        def create_requirements():
-            with open('pyproject.toml', 'r') as f:
-                pyproject = toml.load(f)
-
-            dependencies = pyproject['tool']['poetry']['dependencies']
-            with open('requirements.txt', 'w') as f:
-                for dep, version in dependencies.items():
-                    if dep != 'python':
-                        if isinstance(version, str):
-                            f.write(f"{dep}{version}\n")
-                        elif isinstance(version, dict):
-                            f.write(f"{dep}>= {version.get('gte', '')}, <{version.get('lt', '')}\n")
-        
-        create_requirements()
-        EOF
+        awk '/\[tool.poetry.dependencies\]/,/\[tool.poetry.dev-dependencies\]/ {if ($1 != "python" && $1 != "[tool.poetry.dependencies]" && $1 != "[tool.poetry.dev-dependencies]") print}' pyproject.toml | sed 's/ = /==/g' > requirements.txt
         echo "Contents of requirements.txt:"
         cat requirements.txt
 
@@ -203,6 +186,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
 

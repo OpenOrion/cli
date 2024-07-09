@@ -97,48 +97,23 @@ jobs:
       with:
         python-version: '3.11'
 
-    - name: Set up Miniconda
-      uses: conda-incubator/setup-miniconda@v3
-      with:
-        auto-activate-base: true
-        activate-environment: ""
-
-    - name: Create and activate conda environment
-      shell: bash
-      run: |
-        conda create -n cq python=3.11 -y
-        source $(conda info --base)/etc/profile.d/conda.sh
-        conda activate cq
-        conda install mamba -n base -c conda-forge
-        mamba install -c conda-forge cadquery -y
-
     - name: Install Poetry
-      shell: bash
-      run: |
-        curl -sSL https://install.python-poetry.org | python3 -
+      uses: snok/install-poetry@v1
 
     - name: Install dependencies
-      shell: bash
       run: |
-        source $(conda info --base)/etc/profile.d/conda.sh
-        conda activate cq
         poetry install
         poetry add pyinstaller
 
     - name: Build executable as directory for Apple Silicon macOS
-      shell: bash
       run: |
-        source $(conda info --base)/etc/profile.d/conda.sh
-        conda activate cq
-        poetry run pyinstaller orion.spec
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
     - name: Rename output directory
-      shell: bash
       run: |
         mv dist/orion dist/orion_arm
 
     - name: Zip the output directory
-      shell: bash
       run: |
         cd dist && zip -r orion_arm.zip orion_arm
 
@@ -147,6 +122,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
 

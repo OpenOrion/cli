@@ -68,7 +68,7 @@ jobs:
 
     - name: Build executable as directory
       run: |
-        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" --hidden-import OCP orion_cli/cli.py
 
     - name: Rename output directory
       run: |
@@ -133,7 +133,7 @@ jobs:
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
-        pyinstaller --name orion --onedir --add-data "$CONDA_PREFIX:lib/orion-env" orion_cli/cli.py
+        pyinstaller --name orion --onedir --add-data "$CONDA_PREFIX:lib/orion-env" --hidden-import OCP orion_cli/cli.py
         echo "PyInstaller command executed."
 
     - name: Rename output directory

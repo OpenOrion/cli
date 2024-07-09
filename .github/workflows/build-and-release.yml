@@ -104,26 +104,30 @@ jobs:
       run: |
         poetry export -f requirements.txt --output requirements.txt
 
-    - name: Install Mamba
+    - name: Install Miniforge and Mamba
       run: |
-        brew install mamba
+        curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
+        bash Miniforge3-$(uname)-$(uname -m).sh -b -p ~/miniforge3
+        source ~/miniforge3/etc/profile.d/conda.sh
+        conda init bash
+        conda activate
 
     - name: Create and activate conda environment
       run: |
+        source ~/miniforge3/etc/profile.d/conda.sh
         mamba create -n orion-env -y python=3.11
-        source $(mamba info --base)/etc/profile.d/conda.sh
         conda activate orion-env
 
     - name: Install dependencies with Mamba
       run: |
-        source $(mamba info --base)/etc/profile.d/conda.sh
+        source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
         mamba install -y --file requirements.txt
         mamba install -y pyinstaller
 
     - name: Build executable as directory for Apple Silicon macOS
       run: |
-        source $(mamba info --base)/etc/profile.d/conda.sh
+        source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
         pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
@@ -140,7 +144,6 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
-
 
 
 

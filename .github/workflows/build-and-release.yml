@@ -103,10 +103,11 @@ jobs:
     - name: Export dependencies to requirements.txt
       run: |
         poetry export -f requirements.txt --output requirements.txt --without-hashes
+        echo "Contents of requirements.txt before sed:"
         cat requirements.txt
-        sed '/; python_version/ s/; python_version.*//' requirements.txt > requirements.txt
-        echo "Contents of requirements.txt:"
-        cat requirements.txt
+        sed '/; python_version/ s/; python_version.*//' requirements.txt > requirements_no_version.txt
+        echo "Contents of requirements_no_version.txt:"
+        cat requirements_no_version.txt
 
     - name: Install Miniforge and Mamba
       run: |
@@ -126,7 +127,7 @@ jobs:
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
-        mamba install -y --file requirements.txt
+        mamba install -y --file requirements_no_version.txt
         mamba install -y pyinstaller
 
     - name: List installed packages
@@ -186,12 +187,6 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
-
-
-
-
-
-
 
 
   build-windows:

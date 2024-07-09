@@ -100,14 +100,28 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
-    - name: Export dependencies to requirements.txt
+    - name: Create simplified requirements.txt from pyproject.toml
       run: |
-        poetry export -f requirements.txt --output requirements.txt --without-hashes
-        echo "Contents of requirements.txt before sed:"
+        python - <<EOF
+        import toml
+
+        def create_requirements():
+            with open('pyproject.toml', 'r') as f:
+                pyproject = toml.load(f)
+
+            dependencies = pyproject['tool']['poetry']['dependencies']
+            with open('requirements.txt', 'w') as f:
+                for dep, version in dependencies.items():
+                    if dep != 'python':
+                        if isinstance(version, str):
+                            f.write(f"{dep}{version}\n")
+                        elif isinstance(version, dict):
+                            f.write(f"{dep}>= {version.get('gte', '')}, <{version.get('lt', '')}\n")
+        
+        create_requirements()
+        EOF
+        echo "Contents of requirements.txt:"
         cat requirements.txt
-        sed 's/==.*//' requirements.txt > requirements_no_version.txt
-        echo "Contents of requirements_no_version.txt:"
-        cat requirements_no_version.txt
 
     - name: Install Miniforge and Mamba
       run: |
@@ -127,7 +141,7 @@ jobs:
       run: |
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
-        mamba install -y --file requirements_no_version.txt
+        mamba install -y --file requirements.txt
         mamba install -y pyinstaller
 
     - name: List installed packages
@@ -135,6 +149,8 @@ jobs:
         source ~/miniforge3/etc/profile.d/conda.sh
         conda activate orion-env
         python -m pip list --format=freeze > installed-packages.txt
+        echo "Installed packages:"
+        cat installed-packages.txt
 
     - name: Print Conda environment paths and info
       run: |
@@ -187,6 +203,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
   build-windows:

@@ -100,25 +100,32 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
-    - name: Download cadquery_ocp wheel
+    - name: Export dependencies to requirements.txt
       run: |
-        curl -L -o cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl https://github.com/jdegenstein/ocp-build-system/releases/download/7.7.2_macos_arm64/cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl
+        poetry export -f requirements.txt --output requirements.txt
 
-    - name: Install cadquery_ocp wheel
+    - name: Install Mamba
       run: |
-        pip install cadquery_ocp-7.7.2-cp311-cp311-macosx_11_0_arm64.whl
+        brew install mamba
 
-    - name: Install dependencies
+    - name: Create and activate conda environment
       run: |
-        poetry install --no-root
+        mamba create -n orion-env -y python=3.11
+        source $(mamba info --base)/etc/profile.d/conda.sh
+        conda activate orion-env
 
-    - name: Add pyinstaller
+    - name: Install dependencies with Mamba
       run: |
-        poetry add pyinstaller
+        source $(mamba info --base)/etc/profile.d/conda.sh
+        conda activate orion-env
+        mamba install -y --file requirements.txt
+        mamba install -y pyinstaller
 
     - name: Build executable as directory for Apple Silicon macOS
       run: |
-        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
+        source $(mamba info --base)/etc/profile.d/conda.sh
+        conda activate orion-env
+        pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" orion_cli/cli.py
 
     - name: Rename output directory
       run: |

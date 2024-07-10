@@ -106,7 +106,8 @@ jobs:
       run: |
         pip install git+https://github.com/CadQuery/cadquery.git --no-deps
         curl -L -o custom_cadquery.whl https://github.com/OpenOrion/ocp-build-system/actions/runs/9880318689/artifacts/1688136080
-        pip install custom_cadquery.whl
+        mv custom_cadquery.whl cadquery_custom-2.4.0-py3-none-any.whl
+        pip install cadquery_custom-2.4.0-py3-none-any.whl
 
     - name: Install cadquery
       run: |
@@ -118,6 +119,7 @@ jobs:
     
     - name: Build and install nlopt
       run: |
+        git clone https://github.com/stevengj/nlopt.git
         cd nlopt
         mkdir build
         cd build

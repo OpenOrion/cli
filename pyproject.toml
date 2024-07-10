@@ -13,6 +13,7 @@ click = "^8.0"
 requests = "^2.32.3"
 pygithub = "^2.3.0"
 cadquery = "^2.4.0"
+modulegraph = "^0.19.6"
 [tool.poetry.dev-dependencies]
 pytest = "^6.2"
 pytest-click = "^1.0.2"

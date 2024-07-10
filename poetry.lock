@@ -605,6 +605,21 @@ files = [
 altgraph = ">=0.17"
 
 [[package]]
+name = "modulegraph"
+version = "0.19.6"
+description = "Python module dependency analysis tool"
+optional = false
+python-versions = "*"
+files = [
+    {file = "modulegraph-0.19.6-py2.py3-none-any.whl", hash = "sha256:5443e6d93c0b263f4ea309e2ff01312eef7c424dd51981a1e78e960c90e572b8"},
+    {file = "modulegraph-0.19.6.tar.gz", hash = "sha256:c914c8c95a0e10fe88505d4e9c2284b4e3dbc70943e306cc6567e36cc541bf4b"},
+]
+
+[package.dependencies]
+altgraph = ">=0.15"
+setuptools = "*"
+
+[[package]]
 name = "multimethod"
 version = "1.9.1"
 description = "Multiple argument dispatching."
@@ -1140,4 +1155,4 @@ test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", 
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.8,<3.12"
-content-hash = "c9c982954430706a2b7f49f45de7d925761ce5c60a28118df47cda224d9c105b"
+content-hash = "6172ad7d9591ec08265a5906400bcbf4c77075d95f4b84b975958b0a6598682a"

@@ -25,6 +25,7 @@ jobs:
     - name: Install dependencies
       run: |
         poetry install
+        poetry install --all-extras
         poetry add pyinstaller
 
     - name: Build executable as directory for Linux
@@ -65,6 +66,7 @@ jobs:
     - name: Install dependencies
       run: |
         poetry install
+        poetry install --all-extras
         poetry add pyinstaller
 
     - name: Build executable as directory
@@ -100,41 +102,37 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
-    - name: Create simplified requirements.txt from pyproject.toml
+    - name: Install custom cadquery wheel and cadquery no dependencies
       run: |
-        awk '/\[tool.poetry.dependencies\]/,/\[tool.poetry.dev-dependencies\]/ {if ($1 != "python" && $1 != "[tool.poetry.dependencies]" && $1 != "[tool.poetry.dev-dependencies]") print}' pyproject.toml | \
-        sed 's/ = ".*"//' | sed 's/[",^]//g' | sed '/^$/d' > requirements.txt
-        echo "Contents of requirements.txt:"
-        cat requirements.txt
+        pip install git+https://github.com/CadQuery/cadquery.git --no-deps
+        curl -L -o custom_cadquery.whl https://github.com/OpenOrion/ocp-build-system/actions/runs/9880318689/artifacts/1688136080
+        pip install custom_cadquery.whl
 
-    - name: Install Miniforge and Mamba
+    - name: Install cadquery
       run: |
-        curl -L -O "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh"
-        bash Miniforge3-$(uname)-$(uname -m).sh -b -p ~/miniforge3
-        source ~/miniforge3/etc/profile.d/conda.sh
-        conda init bash
-        conda activate
+        pip install ezdxf multimethod>=1.11,<2.0 typish casadi path
 
-    - name: Create and activate conda environment
+    - name: Install cmake
       run: |
-        source ~/miniforge3/etc/profile.d/conda.sh
-        mamba create -n orion-env -y python=3.11
-        conda activate orion-env
+        brew install cmake
+    
+    - name: Build and install nlopt
+      run: |
+        cd nlopt
+        mkdir build
+        cd build
+        cmake ..
+        make
+        sudo make install
 
-    - name: Install dependencies with Mamba
+    - name: Install dependencies
       run: |
-        source ~/miniforge3/etc/profile.d/conda.sh
-        conda activate orion-env
-        mamba install -y --file requirements.txt
-        mamba install -y pyinstaller
+        poetry install
+        poetry add pyinstaller
 
-    - name: Generate PyInstaller command
-      id: pyinstaller_cmd
+    - name: Build executable as directory
       run: |
-        source ~/miniforge3/etc/profile.d/conda.sh
-        conda activate orion-env
-        pyinstaller --name orion --onedir --add-data "$CONDA_PREFIX:lib/orion-env" --hidden-import OCP --hidden-import vtkmodules.all orion_cli/cli.py
-        echo "PyInstaller command executed."
+        poetry run pyinstaller --name orion --onedir --add-data "orion_cli/services/*.py:orion_cli/services" --hidden-import OCP --hidden-import vtkmodules.all orion_cli/cli.py
 
     - name: Rename output directory
       run: |

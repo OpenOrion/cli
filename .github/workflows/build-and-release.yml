@@ -102,11 +102,23 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
-    - name: Install custom cadquery wheel and cadquery no dependencies
+    - name: Install custom cadquery no dependencies
       run: |
         pip install git+https://github.com/CadQuery/cadquery.git --no-deps
+
+    - name: Fetch cadquery wheel
+      run: |
         curl -L -o custom_cadquery.whl https://github.com/OpenOrion/ocp-build-system/actions/runs/9880318689/artifacts/1688136080
         mv custom_cadquery.whl cadquery_custom-2.4.0-py3-none-any.whl
+
+    - name: Verify downloaded file
+      run: |
+        ls -lh cadquery_custom-2.4.0-py3-none-any.whl
+        file cadquery_custom-2.4.0-py3-none-any.whl
+
+      
+    - name: Install custom cadquery
+      run: |
         pip install cadquery_custom-2.4.0-py3-none-any.whl
 
     - name: Install cadquery

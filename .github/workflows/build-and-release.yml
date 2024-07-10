@@ -110,7 +110,7 @@ jobs:
 
     - name: Install cadquery dependencies
       run: |
-        pip install ezdxf multimethod>=1.11,<2.0 typish casadi path
+        pip install ezdxf multimethod typish casadi path
 
     - name: Install cmake
       run: |

@@ -104,12 +104,16 @@ jobs:
 
     - name: Fetch and install custom cadquery wheel
       run: |
+        FILEID=1JL800iykhLPyJXA1-9XL5KjXYbMP5_DJ
+        FILENAME=custom_cadquery.zip
         echo "Downloading cadquery zip file..."
-        curl -L -o custom_cadquery.zip https://drive.google.com/uc?export=download&id=1JL800iykhLPyJXA1-9XL5KjXYbMP5_DJ
+        curl -c /tmp/cookie -s -L "https://drive.google.com/uc?export=download&id=${FILEID}" > /tmp/intermezzo.html
+        CONFIRM=$(awk '/download/ {print $NF}' /tmp/intermezzo.html | sed 's/confirm=//' | sed 's/[^0-9A-Za-z_\\-]//g')
+        curl -Lb /tmp/cookie "https://drive.google.com/uc?export=download&confirm=${CONFIRM}&id=${FILEID}" -o ${FILENAME}
         echo "Verifying file size..."
-        ls -lh custom_cadquery.zip
+        ls -lh ${FILENAME}
         echo "Extracting cadquery zip file..."
-        unzip custom_cadquery.zip -d custom_cadquery
+        unzip ${FILENAME} -d custom_cadquery
         echo "Installing CadQuery from GitHub..."
         pip install git+https://github.com/CadQuery/cadquery.git --no-deps
         echo "Installing custom cadquery wheel..."
@@ -154,7 +158,6 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
-
 
   build-windows:
     runs-on: windows-latest

@@ -102,26 +102,18 @@ jobs:
     - name: Install Poetry
       uses: snok/install-poetry@v1
 
-    - name: Install custom cadquery no dependencies
+    - name: Fetch and install custom cadquery wheel
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       run: |
-        pip install git+https://github.com/CadQuery/cadquery.git --no-deps
+        echo "Downloading cadquery zip file..."
+        curl -H "Authorization: token $GITHUB_TOKEN" -L -o custom_cadquery.zip https://github.com/OpenOrion/ocp-build-system/actions/runs/9880318689/artifacts/1688136080
+        echo "Extracting cadquery zip file..."
+        unzip custom_cadquery.zip -d custom_cadquery
+        echo "Installing custom cadquery wheel..."
+        pip install custom_cadquery/cadquery-ocp-macos-14-cp3.11.whl
 
-    - name: Fetch cadquery wheel
-      run: |
-        curl -L -o custom_cadquery.whl https://github.com/OpenOrion/ocp-build-system/actions/runs/9880318689/artifacts/1688136080
-        mv custom_cadquery.whl cadquery_custom-2.4.0-py3-none-any.whl
-
-    - name: Verify downloaded file
-      run: |
-        ls -lh cadquery_custom-2.4.0-py3-none-any.whl
-        file cadquery_custom-2.4.0-py3-none-any.whl
-
-      
-    - name: Install custom cadquery
-      run: |
-        pip install cadquery_custom-2.4.0-py3-none-any.whl
-
-    - name: Install cadquery
+    - name: Install cadquery dependencies
       run: |
         pip install ezdxf multimethod>=1.11,<2.0 typish casadi path
 
@@ -131,7 +123,6 @@ jobs:
     
     - name: Build and install nlopt
       run: |
-        git clone https://github.com/stevengj/nlopt.git
         cd nlopt
         mkdir build
         cd build
@@ -139,7 +130,7 @@ jobs:
         make
         sudo make install
 
-    - name: Install dependencies
+    - name: Install Poetry dependencies
       run: |
         poetry install
         poetry add pyinstaller
@@ -161,6 +152,7 @@ jobs:
       with:
         name: orion_arm
         path: dist/orion_arm.zip
+
 
 
   build-windows:

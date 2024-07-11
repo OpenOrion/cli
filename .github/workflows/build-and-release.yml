@@ -102,7 +102,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        poetry install
+        poetry install --add-extras arm
         poetry add pyinstaller
 
     - name: Install cmake

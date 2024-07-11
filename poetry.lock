@@ -67,21 +67,12 @@ ipython = ["ipython"]
 
 [[package]]
 name = "cadquery"
-version = "2.5.0.dev0"
+version = "2.5.0dev"
 description = "CadQuery is a parametric  scripting language for creating and traversing CAD models"
 optional = false
 python-versions = ">=3.9"
 files = []
 develop = false
-
-[package.dependencies]
-cadquery-ocp = ">=7.7.0a0,<7.8"
-casadi = "*"
-ezdxf = "*"
-multimethod = ">=1.11,<2.0"
-nlopt = "*"
-path = "*"
-typish = "*"
 
 [package.extras]
 dev = ["black @ git+https://github.com/cadquery/black.git@cq", "docutils", "ipython", "pytest"]
@@ -889,17 +880,6 @@ files = [
 ]
 
 [[package]]
-name = "multimethod"
-version = "1.12"
-description = "Multiple argument dispatching."
-optional = false
-python-versions = ">=3.9"
-files = [
-    {file = "multimethod-1.12-py3-none-any.whl", hash = "sha256:fd0c473c43558908d97cc06e4d68e8f69202f167db46f7b4e4058893e7dbdf60"},
-    {file = "multimethod-1.12.tar.gz", hash = "sha256:8db8ef2a8d2a247e3570cc23317680892fdf903d84c8c1053667c8e8f7671a67"},
-]
-
-[[package]]
 name = "nlopt"
 version = "2.7.1"
 description = "Library for nonlinear optimization, wrapping many algorithms for global and local, constrained or unconstrained, optimization"
@@ -1597,7 +1577,10 @@ files = [
 doc = ["furo", "jaraco.packaging (>=9.3)", "jaraco.tidelift (>=1.4)", "rst.linker (>=1.9)", "sphinx (>=3.5)", "sphinx-lint"]
 test = ["big-O", "importlib-resources", "jaraco.functools", "jaraco.itertools", "jaraco.test", "more-itertools", "pytest (>=6,!=8.1.*)", "pytest-checkdocs (>=2.4)", "pytest-cov", "pytest-enabler (>=2.2)", "pytest-ignore-flaky", "pytest-mypy", "pytest-ruff (>=0.2.1)"]
 
+[extras]
+arm = []
+
 [metadata]
 lock-version = "2.0"
 python-versions = ">=3.9,<3.12"
-content-hash = "eeca65100062154cb3b14869686fe69fc21457c5f07da460b1d795b167233543"
+content-hash = "9379c4310631158bbf0c1ae9ac1543e7d2c3769638650e94cbcffbd5f9000dd1"

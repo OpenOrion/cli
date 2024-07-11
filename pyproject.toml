@@ -7,10 +7,22 @@ readme = "README.md"
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
-python = ">=3.8,<3.12"
+python = ">=3.9,<3.12"
 click = "^8.0"
 requests = "^2.32.3"
 pygithub = "^2.3.0"
+cadquery = [
+    {version = "^2.4.0", markers = "platform_machine != 'arm64'"},
+    {git = "https://github.com/CadQuery/cadquery.git", markers = "platform_machine == 'arm64'"}
+]
+cadquery-ocp = {url = "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl", markers = "platform_machine == 'arm64'"}
+
+#additional arm dependencies
+ezdxf = {version = "*", markers = "platform_machine == 'arm64'"}
+multimethod = {version = "*", markers = "platform_machine == 'arm64'"}
+typish = {version = "*", markers = "platform_machine == 'arm64'"}
+casadi = {version = "*", markers = "platform_machine == 'arm64'"}
+path = {version = "*", markers = "platform_machine == 'arm64'"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2"
@@ -19,14 +31,12 @@ pytest-click = "^1.0.2"
 [tool.poetry.group.dev.dependencies]
 pyinstaller = "^6.8.0"
 
-[tool.poetry.extras]
-cadquery = ["cadquery"]
-
 [build-system]
 requires = ["poetry-core>=1.0.0"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 orion = "orion_cli.cli:cli"
+
 
 

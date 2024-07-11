@@ -24,7 +24,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        poetry install
+        poetry install --no-root --no-dev
         poetry add pyinstaller
 
     - name: Build executable as directory for Linux
@@ -64,7 +64,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        poetry install
+        poetry install --no-root --no-dev
         poetry add pyinstaller
 
     - name: Build executable as directory
@@ -102,7 +102,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        poetry install --add-extras arm
+        poetry install --no-root --no-dev --all-extras arm
         poetry add pyinstaller
 
     - name: Install cmake
@@ -169,7 +169,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install
+        C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install --no-root --no-dev
         C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry add pyinstaller
       shell: powershell
 

@@ -102,7 +102,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        poetry install --no-root --no-dev --all-extras arm
+        poetry install --no-root --no-dev --extras arm
         poetry add pyinstaller
 
     - name: Install cmake
@@ -118,11 +118,6 @@ jobs:
         cmake ..
         make
         sudo make install
-
-    - name: Install Poetry dependencies
-      run: |
-        poetry install
-        poetry add pyinstaller
 
     - name: Build executable as directory
       run: |

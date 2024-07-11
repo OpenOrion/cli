@@ -15,14 +15,6 @@ cadquery = [
     {version = "^2.4.0", markers = "platform_machine != 'arm64'"},
     {git = "https://github.com/CadQuery/cadquery.git", markers = "platform_machine == 'arm64'"}
 ]
-cadquery-ocp = {url = "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl", markers = "platform_machine == 'arm64'"}
-
-#additional arm dependencies
-ezdxf = {version = "*", markers = "platform_machine == 'arm64'"}
-multimethod = {version = "*", markers = "platform_machine == 'arm64'"}
-typish = {version = "*", markers = "platform_machine == 'arm64'"}
-casadi = {version = "*", markers = "platform_machine == 'arm64'"}
-path = {version = "*", markers = "platform_machine == 'arm64'"}
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2"
@@ -37,6 +29,16 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.poetry.scripts]
 orion = "orion_cli.cli:cli"
+
+[tool.poetry.extras]
+arm = [
+    "ezdxf",
+    "multimethod",
+    "typish",
+    "casadi",
+    "path",
+    {url = "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl", markers = "platform_machine == 'arm64'"}
+]
 
 
 

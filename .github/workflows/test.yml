@@ -22,7 +22,7 @@ jobs:
         id: setup-python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.12'
+          python-version: '3.11'
 
       #----------------------------------------------
       #  -----  install & configure poetry  -----
@@ -49,7 +49,7 @@ jobs:
       #----------------------------------------------
       - name: Install dependencies
         if: steps.cached-poetry-dependencies.outputs.cache-hit != 'true'
-        run: poetry install --no-interaction --no-root
+        run: poetry install --no-lock
 
       #----------------------------------------------
       # install your root project, if required

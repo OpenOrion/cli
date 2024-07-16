@@ -1,3 +1,5 @@
+examples/**/*
+
 # Existing entries
 .venv
 __pycache__/

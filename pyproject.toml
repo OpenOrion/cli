@@ -7,7 +7,7 @@ readme = "README.md"
 license = "Apache-2.0"
 
 [tool.poetry.dependencies]
-python = ">=3.9,<3.12"
+python = ">=3.10,<3.12"
 click = "^8.0"
 requests = "^2.32.3"
 pygithub = "^2.3.0"
@@ -20,6 +20,10 @@ cadquery = [
     {version = "^2.4.0", markers = "platform_machine != 'arm64'"},
     {url = "https://github.com/OpenOrion/cadquery/releases/download/v1.0.0c/cadquery-1.0.0-py3-none-any.whl", markers = "platform_machine == 'arm64'"}
 ]
+pydantic = "^2.8.2"
+ocp-tessellate = "^2.3.3"
+scipy = "^1.14.0"
+
 
 [tool.poetry.dev-dependencies]
 pytest = "^6.2"

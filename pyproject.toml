@@ -13,12 +13,12 @@ requests = "^2.32.3"
 pygithub = "^2.3.0"
 numpy = "<2.0.0"
 cadquery-ocp = [
-    {version = ">=7.7.0a0,<7.8", markers = "platform_machine != 'arm64'"},
-    {url = "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl", markers = "platform_machine == 'arm64'"}
+    {version = ">=7.7.0a0,<7.8", markers = "platform_machine == 'x86_64'"},
+    {url = "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl", markers = "sys_platform == 'darwin' and platform_machine == 'arm64'"}
 ]
 cadquery = [
-    {version = "^2.4.0", markers = "platform_machine != 'arm64'"},
-    {url = "https://github.com/OpenOrion/cadquery/releases/download/v1.0.0c/cadquery-1.0.0-py3-none-any.whl", markers = "platform_machine == 'arm64'"}
+    {version = "^2.4.0", markers = "platform_machine == 'x86_64'"},
+    {url = "https://github.com/OpenOrion/cadquery/releases/download/v1.0.0c/cadquery-1.0.0-py3-none-any.whl", markers = "sys_platform == 'darwin' and platform_machine == 'arm64'"}
 ]
 pydantic = "^2.8.2"
 ocp-tessellate = "^2.3.3"

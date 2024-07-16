@@ -35,6 +35,15 @@ jobs:
           installer-parallel: true
 
       #----------------------------------------------
+      # Remove poetry.lock if it exists
+      #----------------------------------------------
+      - name: Remove poetry.lock
+        run: |
+          if [ -f poetry.lock ]; then
+            rm poetry.lock
+          fi
+
+      #----------------------------------------------
       # install your root project, if required
       #----------------------------------------------
       - name: Install project

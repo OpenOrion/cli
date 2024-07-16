@@ -31,6 +31,7 @@ pytest-click = "^1.0.2"
 
 [tool.poetry.group.dev.dependencies]
 pyinstaller = "^6.8.0"
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

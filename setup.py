@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="orion-cli",
-    version="0.1.0",
+    version="0.1.1",
     description="Command-line tool for Open Orion PLM",
     author="Christian",
     author_email="christian@openorion.org",

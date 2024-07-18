@@ -26,13 +26,13 @@ setup(
         "dev": [
             "pytest",
             "pytest-click",
-            "ipykernel"
+            "ipykernel",
         ]
     },
-    dependency_links=[
-        "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0i/cadquery_ocp-7.7.2.1-cp39-cp39-macosx_11_0_arm64.whl; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.9'",
-        "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0i/cadquery_ocp-7.7.2.1-cp310-cp310-macosx_11_0_arm64.whl; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.10'",
-        "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0i/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl; sys_platform == 'darwin' and platform_machine == 'arm64' and python_version == '3.11'",
+dependency_links=[
+        "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0i/cadquery_ocp-7.7.2.1-cp39-cp39-macosx_11_0_arm64.whl; sys_platform == 'darwin' and platform_machine == 'arm64' and '3.9' <= python_version < '3.10'",
+        "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0i/cadquery_ocp-7.7.2.1-cp310-cp310-macosx_11_0_arm64.whl; sys_platform == 'darwin' and platform_machine == 'arm64' and '3.10' <= python_version < '3.11'",
+        "https://github.com/OpenOrion/ocp-build-system/releases/download/0.1.0i/cadquery_ocp-7.7.2.1-cp311-cp311-macosx_11_0_arm64.whl; sys_platform == 'darwin' and platform_machine == 'arm64' and '3.11' <= python_version < '3.12'",
         "https://github.com/OpenOrion/cadquery/releases/download/v1.0.0d/cadquery-1.0.0-py3-none-any.whl; sys_platform == 'darwin' and platform_machine == 'arm64'"
     ],
     entry_points={

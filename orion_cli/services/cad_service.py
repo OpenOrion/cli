@@ -42,17 +42,17 @@ class Assembly(BaseModel):
             cq_assembly.add(subassembly.to_cq(project), name=subassembly.name)
         for part_ref in self.parts:
             part = project.inventory.parts[part_ref.checksum]
-            loc = cq.Location(
-                cq.Vector(*part_ref.position),
-                tuple(
-                    R.from_matrix(part_ref.orientation)
-                    .as_euler("xyz", degrees=True)
-                    .tolist()
-                ),
-            )
-            cq_assembly.add(
-                part, color=cq.Color(*part_ref.color), name=part_ref.name, loc=loc
-            )
+            loc = CadHelper.get_location(part_ref.orientation, part_ref.position)
+            
+            # TODO: find a better solution to handle negative rotation determinants (mirrors)
+            if loc.wrapped.Transformation().IsNegative():
+                aligned_part = CadHelper.transform_solid(part, part_ref.orientation,part_ref.position)
+                cq_assembly.add(aligned_part, color=cq.Color(*part_ref.color), name=part_ref.name)
+            else:
+                cq_assembly.add(
+                    part, color=cq.Color(*part_ref.color), name=part_ref.name, loc=loc
+                )
+
         return cq_assembly
 
 
@@ -193,10 +193,10 @@ class CadService:
     ):
         if part_index is None:
             part_index = PartIndex()
+        aligned_part = cq_subassembly.obj.val().located(cq_subassembly.loc)
 
         # check if part has been aligned before
         if part_index.prev_project:
-            aligned_part = cq_subassembly.obj.val().located(cq_subassembly.loc)
             aligned_checksum = CadHelper.get_part_checksum(aligned_part)
 
             if aligned_checksum in part_index.aligned_refs:
@@ -207,23 +207,36 @@ class CadService:
             part_index.aligned_refs[aligned_checksum] = part_ref
 
         # otherwise align part and normalize
-        aligned_part = cq_subassembly.obj.val().located(cq_subassembly.loc)
         part_group = (
             np.round(aligned_part.Area(), 3),
             len(aligned_part._entities("Vertex")),
         )
-        base_part, offset, rotmat = CadHelper.normalize_part_with_inertial_axis(aligned_part)
+        # normalized_part, offset, rotmat = CadHelper.normalize_part_with_inertial_axis(aligned_part)
+        offset = np.array(aligned_part.Center().toTuple())
+        rotmat = np.eye(3)
+        normalized_part = aligned_part.translate((-offset).tolist())
+        
 
         # check if part has been normalized before
         if part_group not in part_index.base_parts:
-            part_index.base_parts[part_group] = base_part
+            base_part = normalized_part
+            part_index.base_parts[part_group] = normalized_part
         else:
             # align part with previously normalized part (in case of symetric inertial axis)
             base_part = part_index.base_parts[part_group]
-            rot_mat_adjustment = CadHelper.align_parts(base_part, base_part)
+            rot_mat_adjustment = CadHelper.align_parts(base_part, normalized_part)
             rotmat = rotmat.dot(rot_mat_adjustment)
-
+        
         part_checksum = CadHelper.get_part_checksum(base_part)
+
+        # recreated_original_solid = CadHelper.transform_solid(part_index.base_parts[part_group], rotmat).translate(offset.tolist())
+        # recreated_original_solid_checksum = CadHelper.get_part_checksum(recreated_original_solid)
+        # original_solid_checksum = CadHelper.get_part_checksum(aligned_part)
+
+        # assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"
+
+
+
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
             checksum=part_checksum,

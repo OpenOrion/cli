@@ -15,7 +15,8 @@ from scipy.spatial.transform import Rotation as R
 from ocp_tessellate.tessellator import Tessellator, compute_quality
 from ocp_tessellate.ocp_utils import bounding_box, get_location
 import cadquery as cq
-
+from OCP.TopLoc import TopLoc_Location
+from OCP.gp import gp_Quaternion, gp_Mat, gp_Vec
 
 
 @dataclass
@@ -58,12 +59,23 @@ class CadHelper:
             edges=edges,
         )
 
+    @staticmethod
     def transform_solid(
         solid: cq.Solid, orientation: np.ndarray, offset: Optional[np.ndarray] = None
     ):
         if offset is None:
             offset = np.zeros(3)
-        # Create a transformation object
+
+        # Get the transformation
+        loc = CadHelper.get_location(orientation, offset)
+        transformation = loc.wrapped.Transformation()
+
+        # Apply the transformation
+        transformer = BRepBuilderAPI_Transform(solid.wrapped, transformation, False)
+        return cq.Solid(transformer.Shape())
+
+    @staticmethod
+    def get_location(orientation: np.ndarray, offset: np.ndarray):
         transformation = gp_Trsf()
         transformation.SetValues(
             orientation[0][0],
@@ -79,10 +91,8 @@ class CadHelper:
             orientation[2][2],
             offset[2],
         )
+        return cq.Location(transformation)
 
-        # Apply the transformation to the box
-        transformer = BRepBuilderAPI_Transform(solid.wrapped, transformation, True)
-        return cq.Solid(transformer.Shape())
 
     @staticmethod
     def import_brep(file_path: Union[Path, str]):
@@ -102,71 +112,79 @@ class CadHelper:
         BRepTools.Write_s(shape, file_path)
 
     @staticmethod
-    def normalize_part_with_inertial_axis(solid: cq.Solid):
+    def normalize_part(solid: cq.Solid, norm_axis: bool = False):
         offset = np.array(solid.Center().toTuple())
         centered_solid = solid.translate((-offset).tolist())
 
         curr_solid = centered_solid
-        has_symetric_axis = False
         rotmat_axis_of_inertia = np.eye(3)
-        for axis_index in range(2):
-            axis_vector = np.zeros(3)
-            axis_vector[axis_index] = 1
 
-            Properties = GProp_GProps()
-            BRepGProp.VolumeProperties_s(curr_solid.wrapped, Properties)
-            principle_properties = Properties.PrincipalProperties()
+        if norm_axis:
+            has_symetric_axis = False
+            for axis_index in range(2):
+                axis_vector = np.zeros(3)
+                axis_vector[axis_index] = 1
 
-            has_symetric_axis = principle_properties.HasSymmetryAxis()
+                Properties = GProp_GProps()
+                BRepGProp.VolumeProperties_s(curr_solid.wrapped, Properties)
+                principle_properties = Properties.PrincipalProperties()
 
-            axis_of_inertias_occ = (
-                principle_properties.FirstAxisOfInertia(),
-                principle_properties.SecondAxisOfInertia(),
-                principle_properties.ThirdAxisOfInertia(),
-            )
+                has_symetric_axis = principle_properties.HasSymmetryAxis()
+                axis_of_inertias_occ = (
+                    principle_properties.FirstAxisOfInertia(),
+                    principle_properties.SecondAxisOfInertia(),
+                    principle_properties.ThirdAxisOfInertia(),
+                )
 
-            axis_of_inertias = np.array(
-                [
-                    (
-                        axis_of_inertias_occ[0].X(),
-                        axis_of_inertias_occ[0].Y(),
-                        axis_of_inertias_occ[0].Z(),
-                    ),
-                    (
-                        axis_of_inertias_occ[1].X(),
-                        axis_of_inertias_occ[1].Y(),
-                        axis_of_inertias_occ[1].Z(),
-                    ),
-                    (
-                        axis_of_inertias_occ[2].X(),
-                        axis_of_inertias_occ[2].Y(),
-                        axis_of_inertias_occ[2].Z(),
-                    ),
-                ]
-            )
+                axis_of_inertias = np.array(
+                    [
+                        (
+                            axis_of_inertias_occ[0].X(),
+                            axis_of_inertias_occ[0].Y(),
+                            axis_of_inertias_occ[0].Z(),
+                        ),
+                        (
+                            axis_of_inertias_occ[1].X(),
+                            axis_of_inertias_occ[1].Y(),
+                            axis_of_inertias_occ[1].Z(),
+                        ),
+                        (
+                            axis_of_inertias_occ[2].X(),
+                            axis_of_inertias_occ[2].Y(),
+                            axis_of_inertias_occ[2].Z(),
+                        ),
+                    ]
+                )
 
-            # Ensure the first principal component points in the positive x-direction
-            if axis_of_inertias[0, 0] < 0:
-                axis_of_inertias[0] = -axis_of_inertias[0]
-            # Ensure the second principal component points in the positive y-direction
-            if axis_of_inertias[1, 1] < 0:
-                axis_of_inertias[1] = -axis_of_inertias[1]
-            # Ensure the third principal component points in the positive z-direction
-            if axis_of_inertias[2, 2] < 0:
-                axis_of_inertias[2] = -axis_of_inertias[2]
+                # Ensure the first principal component points in the positive x-direction
+                if axis_of_inertias[0, 0] < 0:
+                    axis_of_inertias[0] = -axis_of_inertias[0]
+                # Ensure the second principal component points in the positive y-direction
+                if axis_of_inertias[1, 1] < 0:
+                    axis_of_inertias[1] = -axis_of_inertias[1]
+                # Ensure the third principal component points in the positive z-direction
+                if axis_of_inertias[2, 2] < 0:
+                    axis_of_inertias[2] = -axis_of_inertias[2]
 
-            rotmat_axis_of_inertia = axis_of_inertias.dot(rotmat_axis_of_inertia)
-            curr_solid = CadHelper.transform_solid(curr_solid, axis_of_inertias)
+                rotmat_axis_of_inertia = axis_of_inertias.dot(rotmat_axis_of_inertia)
+                curr_solid = CadHelper.transform_solid(curr_solid, axis_of_inertias)
+        
         rotmat = rotmat_axis_of_inertia.T
         return curr_solid, offset, rotmat
 
     @staticmethod
-    def align_parts(part1: cq.Solid, part2: cq.Solid):
-        vertices1 = np.array([vertex.toTuple() for vertex in part1.Vertices()])
-        vertices2 = np.array([vertex.toTuple() for vertex in part2.Vertices()])
+    def geo_align_vertices(vertices1, vertices2):
+        """
+        Align vertices2 to vertices1 using Procrustes analysis.
 
-        assert len(vertices1) == len(vertices2), "part1 and part2 are different"
+        Parameters:
+        vertices1 (numpy.ndarray): Vertices of the first solid (N x 3).
+        vertices2 (numpy.ndarray): Vertices of the second solid (N x 3).
 
+        Returns:
+        aligned_vertices2 (numpy.ndarray): Rotated vertices2 aligned with vertices1.
+        rotation_matrix (numpy.ndarray): Rotation matrix applied to vertices2.
+        """
         # Center the vertices to the origin
         centroid1 = np.mean(vertices1, axis=0)
         centroid2 = np.mean(vertices2, axis=0)
@@ -178,21 +196,36 @@ class CadHelper:
 
         # Singular Value Decomposition (SVD)
         U, S, Vt = np.linalg.svd(H)
-        rotmat = np.dot(Vt.T, U.T)
+        rotation_matrix = np.dot(Vt.T, U.T)
 
         # Ensure the rotation matrix is proper (determinant should be +1)
         # if np.linalg.det(rotation_matrix) < 0:
         #     Vt[2, :] *= -1
         #     rotation_matrix = np.dot(Vt.T, U.T)
+            # print(np.linalg.det(rotation_matrix))
 
-        solid2_aligned_vertices = np.dot(vertices2, rotmat)
-        error = np.sum(np.sum(vertices1 - solid2_aligned_vertices, axis=0))
-        if error < 1e-3:
+        # Rotate vertices2 to align with vertices1
+        # aligned_vertices2 = np.dot(vertices2_centered, rotation_matrix)
+
+        # # Translate aligned vertices to the position of vertices1
+        # aligned_vertices2 += centroid1
+
+        return rotation_matrix
+
+    @staticmethod
+    def align_parts(part1: cq.Solid, part2: cq.Solid):
+        vertices1 = np.array([vertex.toTuple() for vertex in part1.Vertices()])
+        vertices2 = np.array([vertex.toTuple() for vertex in part2.Vertices()])
+
+        assert len(vertices1) == len(vertices2), "solid1 and solid2 are different"
+        
+        rotmat = CadHelper.geo_align_vertices(vertices2, vertices1)
+        aligned_vertices2 = np.dot(vertices2, rotmat)
+        error = np.sum(np.sum(vertices1 - aligned_vertices2, axis=0))
+        if error < 1E-3:
             return rotmat
 
-        raise ValueError("failed to align parts")
-
-
+        raise ValueError(f"failed to align, error: {error}")
 
     @staticmethod
     def get_part_checksum(solid: cq.Solid, precision=3):
@@ -209,9 +242,3 @@ class CadHelper:
         vertices_hash = hashlib.md5(sorted_tri_vertices.tobytes()).digest()
         return hashlib.md5(vertices_hash).hexdigest()
 
-
-
-# recreated_original_solid = CadHelper.transform_solid(index.part_index_to_part[part_index], rotmat).translate(offset.tolist())
-# recreated_original_solid_checksum = CadHelper.get_part_checksum(recreated_original_solid)
-# original_solid_checksum = CadHelper.get_part_checksum(aligned_part)
-# assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"

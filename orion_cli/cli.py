@@ -1,6 +1,8 @@
 import click
 import os
 
+CACHE_FILE_PATH = 'cadquery_run.cache'
+
 class CustomPath(click.Path):
     def convert(self, value, param, ctx):
         value = os.path.expanduser(value)
@@ -70,6 +72,11 @@ def sync_command(project_path):
 @cli.command(name="test_cadquery")
 def test_cadquery_command():
     """Test CadQuery by creating and displaying a basic shape"""
+    if not os.path.exists(CACHE_FILE_PATH):
+        click.echo("This may take a while the first time it is run. Please be patient...")
+        with open(CACHE_FILE_PATH, 'w') as f:
+            f.write("")  # Create the cache file
+
     import cadquery as cq
     from cadquery import exporters
 

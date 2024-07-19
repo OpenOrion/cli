@@ -1,4 +1,6 @@
 examples/**/*
+cadquery_run.cache
+test_shape.stl
 
 # Existing entries
 .venv

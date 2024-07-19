@@ -3,6 +3,7 @@ import os
 
 CACHE_FILE_PATH = 'cadquery_run.cache'
 
+# TODO: look into just using a pathlib.Path
 class CustomPath(click.Path):
     def convert(self, value, param, ctx):
         value = os.path.expanduser(value)
@@ -26,11 +27,11 @@ def cli():
     "--step-file", type=CustomPath(exists=True), prompt="Please enter the path for a step file (CAD/3D) to be processed with the tool",
     help="The path for a step file (CAD/3D) to be processed with the tool", required=False
 )
-def create_command(name, path, step_file):
+def create_command(name: str, path: str, cad_path: str):
     """Create a new project"""
     from orion_cli.services.create_service import CreateService
     service = CreateService()
-    service.create(name, path, step_file)
+    service.create(name, path, cad_path)
 
 @cli.command(name="config")
 def config_command():
@@ -52,7 +53,7 @@ def config_command():
     "--commit-message", default="Updated project structure", prompt="Please enter the commit message",
     help="The commit message for the revision"
 )
-def revision_command(project_path, step_file, commit_message):
+def revision_command(project_path: str, step_file: str, commit_message: str):
     """Update the project structure and commit the changes"""
     from orion_cli.services.revision_service import RevisionService
     service = RevisionService()
@@ -63,7 +64,7 @@ def revision_command(project_path, step_file, commit_message):
     "--project-path", type=CustomPath(exists=True), prompt="Please enter the project path",
     help="The path of the project to be synchronized"
 )
-def sync_command(project_path):
+def sync_command(project_path: str):
     """Sync the project with the remote repository"""
     from orion_cli.services.sync_service import SyncService
     service = SyncService()

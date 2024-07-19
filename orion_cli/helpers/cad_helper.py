@@ -1,4 +1,4 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 from typing import Optional, Union
@@ -11,12 +11,10 @@ from OCP.BRepTools import BRepTools
 from OCP.BRep import BRep_Builder, BRep_Tool
 import cadquery as cq
 from OCP.BRepGProp import BRepGProp
-from scipy.spatial.transform import Rotation as R
 from ocp_tessellate.tessellator import Tessellator, compute_quality
 from ocp_tessellate.ocp_utils import bounding_box, get_location
 import cadquery as cq
-from OCP.TopLoc import TopLoc_Location
-from OCP.gp import gp_Quaternion, gp_Mat, gp_Vec
+from orion_cli.readers.step_reader import StepReader
 
 
 @dataclass
@@ -106,6 +104,19 @@ class CadHelper:
         if return_code is False:
             raise ValueError("Import failed, check file name")
         return shape
+    
+    @staticmethod
+    def import_step(file_path: Union[Path, str]) -> cq.Assembly:
+        """
+        Import a STEP file
+        Returns a TopoDS_Shape object
+        """
+        assert file_path.exists(), f"File not found: {file_path}"
+        assert file_path.suffix.lower() in [".step", ".stp"], "Invalid file type"
+
+        r = StepReader()
+        r.load(str(file_path))
+        return r.to_cadquery()
 
     @staticmethod
     def export_brep(shape: TopoDS_Shape, file_path: str):
@@ -234,11 +245,11 @@ class CadHelper:
             [CadHelper.vertex_to_Tuple(TopoDS.Vertex_s(v)) for v in solid._entities("Vertex")]
         )
 
-        rounded_tri_vertices = np.round(vertices, precision)
+        rounded_vertices = np.round(vertices, precision)
 
-        sorted_indices = np.lexsort(rounded_tri_vertices.T)
-        sorted_tri_vertices = rounded_tri_vertices[sorted_indices]
+        sorted_indices = np.lexsort(rounded_vertices.T)
+        sorted_vertices = rounded_vertices[sorted_indices]
 
-        vertices_hash = hashlib.md5(sorted_tri_vertices.tobytes()).digest()
+        vertices_hash = hashlib.md5(sorted_vertices.tobytes()).digest()
         return hashlib.md5(vertices_hash).hexdigest()
 

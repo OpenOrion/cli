@@ -15,7 +15,7 @@ numpy = "<2.0.0"
 cadquery = [
     {version = "^2.4.0", markers = "platform_machine == 'x86_64'"},
 ]
-cadquery-arm-test = [
+cadquery-arm = [
     {version = "*", markers = "sys_platform == 'darwin' and platform_machine == 'arm64'"}
 ]
 pydantic = "^2.8.2"

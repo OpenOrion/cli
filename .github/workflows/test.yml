@@ -42,8 +42,12 @@ jobs:
       #----------------------------------------------
       - name: Remove poetry.lock
         run: |
-          if [ -f poetry.lock ]; then
-            rm poetry.lock
+          if [[ "$RUNNER_OS" == "Windows" ]]; then
+            if (Test-Path -Path poetry.lock) { Remove-Item poetry.lock }
+          else
+            if [ -f poetry.lock ]; then
+              rm poetry.lock
+            fi
           fi
 
       #----------------------------------------------
@@ -57,5 +61,6 @@ jobs:
       #----------------------------------------------
       - name: Run tests
         run: poetry run pytest
+
 
 

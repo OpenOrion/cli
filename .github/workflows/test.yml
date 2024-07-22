@@ -38,6 +38,14 @@ jobs:
           installer-parallel: true
 
       #----------------------------------------------
+      # Add Poetry to PATH on Windows
+      #----------------------------------------------
+      - name: Add Poetry to PATH (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          echo "##[add-path]C:\\Users\\runneradmin\\.local\\bin" >> $GITHUB_ENV
+
+      #----------------------------------------------
       # Remove poetry.lock if it exists
       #----------------------------------------------
       - name: Remove poetry.lock (Linux/Mac)
@@ -63,5 +71,6 @@ jobs:
       #----------------------------------------------
       - name: Run tests
         run: poetry run pytest
+
 
 

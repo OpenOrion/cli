@@ -91,9 +91,9 @@ jobs:
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: |
-          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry shell
-          poetry run pytest
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry run pytest
         shell: powershell
+
 
 
 

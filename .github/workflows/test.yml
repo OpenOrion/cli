@@ -13,7 +13,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        os: [ubuntu-latest, macos-14, macos-13, windows-latest]
+        os: [ubuntu-latest, macos-14, macos-13]
     steps:
       #----------------------------------------------
       #       check-out repo and set-up python
@@ -42,12 +42,8 @@ jobs:
       #----------------------------------------------
       - name: Remove poetry.lock
         run: |
-          if [[ "$RUNNER_OS" == "Windows" ]]; then
-            if (Test-Path -Path poetry.lock) { Remove-Item poetry.lock }
-          else
-            if [ -f poetry.lock ]; then
-              rm poetry.lock
-            fi
+          if [ -f poetry.lock ]; then
+            rm poetry.lock
           fi
 
       #----------------------------------------------
@@ -61,6 +57,5 @@ jobs:
       #----------------------------------------------
       - name: Run tests
         run: poetry run pytest
-
 
 

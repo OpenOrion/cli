@@ -30,20 +30,27 @@ jobs:
       #----------------------------------------------
       #  -----  install & configure poetry  -----
       #----------------------------------------------
-      - name: Install Poetry
+      - name: Install Poetry (Linux/Mac)
+        if: runner.os != 'Windows'
         uses: snok/install-poetry@v1
         with:
           virtualenvs-create: true
           virtualenvs-in-project: true
           installer-parallel: true
 
-      #----------------------------------------------
-      # Add Poetry to PATH on Windows
-      #----------------------------------------------
+      - name: Install Poetry (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          (Invoke-WebRequest -Uri https://install.python-poetry.org -UseBasicParsing).Content | python -
+        shell: powershell
+
       - name: Add Poetry to PATH (Windows)
         if: runner.os == 'Windows'
         run: |
-          echo "##[add-path]C:\\Users\\runneradmin\\.local\\bin" >> $GITHUB_ENV
+          $env:Path += ";C:\Users\runneradmin\AppData\Roaming\Python\Scripts"
+          [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Process)
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry --version
+        shell: powershell
 
       #----------------------------------------------
       # Remove poetry.lock if it exists
@@ -59,18 +66,34 @@ jobs:
         if: runner.os == 'Windows'
         run: |
           if (Test-Path -Path poetry.lock) { Remove-Item poetry.lock }
+        shell: powershell
 
       #----------------------------------------------
       # install your root project, if required
       #----------------------------------------------
-      - name: Install project
+      - name: Install project (Linux/Mac)
+        if: runner.os != 'Windows'
         run: poetry install --no-interaction
+
+      - name: Install project (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install --no-root --no-dev
+        shell: powershell
 
       #----------------------------------------------
       #              run test suite
       #----------------------------------------------
-      - name: Run tests
+      - name: Run tests (Linux/Mac)
+        if: runner.os != 'Windows'
         run: poetry run pytest
+
+      - name: Run tests (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry run pytest
+        shell: powershell
+
 
 
 

@@ -40,11 +40,17 @@ jobs:
       #----------------------------------------------
       # Remove poetry.lock if it exists
       #----------------------------------------------
-      - name: Remove poetry.lock
+      - name: Remove poetry.lock (Linux/Mac)
+        if: runner.os != 'Windows'
         run: |
           if [ -f poetry.lock ]; then
             rm poetry.lock
           fi
+
+      - name: Remove poetry.lock (Windows)
+        if: runner.os == 'Windows'
+        run: |
+          if (Test-Path -Path poetry.lock) { Remove-Item poetry.lock }
 
       #----------------------------------------------
       # install your root project, if required

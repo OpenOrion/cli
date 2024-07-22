@@ -22,7 +22,6 @@ pydantic = "^2.8.2"
 ocp-tessellate = "^2.3.3"
 scipy = "^1.14.0"
 
-
 [tool.poetry.dev-dependencies]
 pytest = "^6.2"
 pytest-click = "^1.0.2"

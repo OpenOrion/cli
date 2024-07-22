@@ -78,7 +78,7 @@ jobs:
       - name: Install project (Windows)
         if: runner.os == 'Windows'
         run: |
-          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install --no-root --no-dev
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry install --no-interaction
         shell: powershell
 
       #----------------------------------------------
@@ -91,8 +91,10 @@ jobs:
       - name: Run tests (Windows)
         if: runner.os == 'Windows'
         run: |
-          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry run pytest
+          C:\Users\runneradmin\AppData\Roaming\Python\Scripts\poetry shell
+          poetry run pytest
         shell: powershell
+
 
 
 

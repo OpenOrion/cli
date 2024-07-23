@@ -1,8 +1,8 @@
+import logging
 from pathlib import Path
 import subprocess
 from typing import Union
 import click
-
 from orion_cli.services.cad_service import CadService, ProjectOptions
 from .base_service import BaseService
 
@@ -72,7 +72,7 @@ class RevisionService(BaseService):
         try:
             click.echo(f"Revising project at {project_path} with CAD file {cad_path}")
             # Regenerate the project structure
-            CadService.revise_project(project_path, cad_path, write=True, project_options=project_options)
+            CadService.revise_project(project_path, cad_path, write=True, project_options=project_options, verbose=True)
 
             # Show changes before staging
             self.show_changes(project_path)

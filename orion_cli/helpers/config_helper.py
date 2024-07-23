@@ -1,6 +1,8 @@
-from typing import Optional, Dict, List
+from typing import Optional
 from pydantic import BaseModel, Field
 from pathlib import Path
+import yaml
+
 
 # Assuming ProjectOptions is defined in cad_service.py
 from orion_cli.services.cad_service import ProjectOptions
@@ -14,6 +16,13 @@ class ProjectConfig(BaseModel):
     options: ProjectOptions = Field(default_factory=ProjectOptions)
     repo_url: Optional[GitRepoUrl] = None
     cad_path: Optional[CadPath] = None
+
+class ConfigHelper:
+    @staticmethod
+    def load_config(config_path: Path) -> ProjectConfig:
+        with open(config_path, 'r') as file:
+            config_data = yaml.safe_load(file)
+        return ProjectConfig(**config_data)
 
 # class GlobalConfig(BaseModel):
 #     default_project_options: ProjectOptions = Field(default_factory=ProjectOptions)

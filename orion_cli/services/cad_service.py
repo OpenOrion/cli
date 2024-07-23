@@ -337,12 +337,14 @@ class CadService:
         CadService.write_project(project_path, project)
 
     @staticmethod
-    def revise_project(project_path: Path, cad_path: Path, write=False):
+    def revise_project(project_path: Path, cad_path: Path, write=False, project_options: Optional[ProjectOptions] = None):
         prev_project = CadService.read_project(project_path)
 
         cq_assembly = CadHelper.import_step(cad_path)
 
         revised_project = Project()
+        if project_options:
+            revised_project.options = project_options
         index = AssemblyIndex(prev_project=prev_project)
         CadService.read_cqassembly(cq_assembly, revised_project, index)
 

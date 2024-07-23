@@ -59,6 +59,11 @@ class CreateService(BaseService):
 
             click.echo("Git repository initialized and .gitignore file created.")
 
+            # Make initial commit
+            subprocess.run(["git", "add", "."], cwd=project_path, check=True)
+            subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=project_path, check=True)
+            click.echo("Initial commit made.")
+
         except Exception as e:
             click.echo(f"Error: {e}")
 

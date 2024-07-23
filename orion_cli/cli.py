@@ -1,5 +1,6 @@
 import click
 import os
+from typing import Optional
 
 CACHE_FILE_PATH = 'cadquery_run.cache'
 
@@ -79,42 +80,122 @@ def create_command(name: str, cad_path: str, remote_url: str):
 
     click.echo("Project creation/update completed successfully.")
 
-@cli.command(name="config")
-def config_command():
-    """Configure GitHub credentials"""
-    from orion_cli.services.config_service import ConfigService
-    service = ConfigService()
-    service.config()
-
 @cli.command(name="revision")
-@click.option(
-    "--project-path", type=CustomPath(exists=True), prompt="Please enter the project path",
-    help="The path of the project to be revised"
-)
-@click.option(
-    "--step-file", type=CustomPath(exists=True), prompt="Please enter the step file path",
-    help="The path for a step file (CAD/3D) to be processed with the tool"
-)
-@click.option(
-    "--commit-message", default="Updated project structure", prompt="Please enter the commit message",
-    help="The commit message for the revision"
-)
-def revision_command(project_path: str, cad_path: str, commit_message: str):
+@click.option("--project-path", type=CustomPath(exists=True),help="The path of the project to be revised", required=False)
+@click.option("--cad_path", type=CustomPath(exists=True), help="The path for a step file (CAD/3D) to be processed with the tool", required=False)
+def revision_command(project_path: str, cad_path: str):
     """Update the project structure and commit the changes"""
     from orion_cli.services.revision_service import RevisionService
-    service = RevisionService()
-    service.revision(project_path, cad_path, commit_message)
+    from pathlib import Path
+    from orion_cli.helpers.config_helper import ConfigHelper
 
-@cli.command(name="sync")
-@click.option(
-    "--project-path", type=CustomPath(exists=True), prompt="Please enter the project path",
-    help="The path of the project to be synchronized"
-)
-def sync_command(project_path: str):
-    """Sync the project with the remote repository"""
-    from orion_cli.services.sync_service import SyncService
-    service = SyncService()
-    service.sync(project_path)
+    if not project_path:
+        project_path = Path.cwd()
+
+    config_path = project_path / "config.yaml"
+    if not config_path.exists():
+        click.echo("No config.yaml found in the project directory.")
+        click.echo("You can create a project using 'orion create' or provide a valid project path.")
+        return
+
+    # Load the configuration
+    config = ConfigHelper.load_config(config_path)
+
+    # Use the cad_path from the config if not provided as an argument
+    if not cad_path:
+        cad_path = config.cad_path
+        if not cad_path or not Path(cad_path).is_file():
+            click.echo("Invalid CAD path provided in config.")
+            return
+
+    service = RevisionService()
+    service.revision(project_path, cad_path, config.options)
+
+@cli.command(name="deploy")
+@click.option("--deploy-msg",help="Project deployment message",required=False)
+def deploy_command(deploy_msg: Optional[str|None] = None):
+    """Deploy the project to the remote repository"""
+    from orion_cli.services.deploy_service import DeployService
+    from orion_cli.helpers.config_helper import ConfigHelper
+    from pathlib import Path
+    from orion_cli.helpers.remote_helper import RemoteHelper
+    import subprocess
+
+    """Deploy the project to the remote repository"""
+    project_path = Path.cwd()
+    config_path = project_path / "config.yaml"
+
+    if not config_path.exists():
+        click.echo("No config.yaml found in the project directory.")
+        click.echo("You can create a project using 'orion create' or provide a valid project path.")
+        return
+
+    # Load the configuration
+    config = ConfigHelper.load_config(config_path)
+    if not config.repo_url:
+        click.echo("No remote repository URL found in the project config.yaml.")
+        click.echo("Please update the config.yaml file with the remote repository URL.")
+        return
+
+    # 1 & 2. Check and update remote URL if necessary
+    try:
+        current_remote = subprocess.check_output(
+            ["git", "config", "--get", "remote.origin.url"],
+            universal_newlines=True, stderr=subprocess.DEVNULL
+        ).strip()
+    except subprocess.CalledProcessError:
+        current_remote = None
+
+    if current_remote != config.repo_url:
+        click.echo(f"Updating the remote URL to {config.repo_url}...")
+        try:
+            if current_remote:
+                subprocess.check_call(["git", "remote", "set-url", "origin", config.repo_url])
+            else:
+                subprocess.check_call(["git", "remote", "add", "origin", config.repo_url])
+        except subprocess.CalledProcessError:
+            click.echo("Failed to update the remote URL. Please check your config.yaml and try again.")
+            return
+
+    # 3. Validate the remote URL
+    if not RemoteHelper.validate_remote_url(config.repo_url):
+        click.echo("The remote URL in config.yaml is not valid or not accessible.")
+        click.echo("Please update your config.yaml with a valid remote URL and try again.")
+        return
+
+    # 4. Set up tracking for the current branch
+    try:
+        current_branch = subprocess.check_output(
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"],
+            universal_newlines=True
+        ).strip()
+
+        # Check if the remote branch exists
+        remote_branches = subprocess.check_output(
+            ["git", "ls-remote", "--heads", "origin", current_branch],
+            universal_newlines=True
+        ).strip()
+
+        if remote_branches:
+            # Remote branch exists, set up tracking
+            subprocess.check_call([
+                "git", "branch", "--set-upstream-to", f"origin/{current_branch}", current_branch
+            ])
+            click.echo(f"Tracking set up for branch '{current_branch}' with 'origin/{current_branch}'")
+        else:
+            # Remote branch doesn't exist, prepare to push
+            click.echo(f"Remote branch 'origin/{current_branch}' doesn't exist. It will be created on first push.")
+
+        click.echo("Remote URL validated and branch tracking configured successfully.")
+    except subprocess.CalledProcessError as e:
+        click.echo(f"An error occurred while setting up branch tracking: {e}")
+        click.echo("Continuing with deployment, but you may need to push with '-u' flag on first push.")
+
+    if not deploy_msg:
+        deploy_msg = click.prompt("Please enter a deployment message")
+    # Proceed with deployment
+    service = DeployService()
+    service.deploy(deploy_msg)
 
 @cli.command(name="test_cadquery")
 def test_cadquery_command():

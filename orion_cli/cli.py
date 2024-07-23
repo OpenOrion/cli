@@ -3,6 +3,7 @@ from typing import Optional, Union
 import click
 import os
 
+from orion_cli.services.display_service import DisplayService
 from orion_cli.services.log_service import logger
 from typing import Optional
 
@@ -102,6 +103,25 @@ def revision_command(project_path: Union[str, Path], cad_path: str):
 
     service = RevisionService()
     service.revision(project_path, cad_path, config.options)
+
+@cli.command(name="display")
+@click.option("--project-path", type=click.Path(exists=True),help="The path of the project to be revised", required=False)
+def display_command(project_path: Union[str, Path]):
+    """Update the project structure and commit the changes"""
+    from orion_cli.services.revision_service import RevisionService
+    from pathlib import Path
+    from orion_cli.helpers.config_helper import ConfigHelper
+
+    project_path = Path.cwd() if not project_path else Path(project_path)
+    config_path = project_path / "config.yaml"
+    if not config_path.exists():
+        click.echo("No config.yaml found in the project directory.")
+        click.echo("You can create a project using 'orion create' or provide a valid project path.")
+        return
+
+    service = DisplayService()
+    service.display(project_path)
+
 
 @cli.command(name="deploy")
 @click.option("--deploy-msg",help="Project deployment message",required=False)

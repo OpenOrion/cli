@@ -1,5 +1,5 @@
 *.pkl
-examples/**/*
+examples/test
 cadquery_run.cache
 test_shape.stl
 

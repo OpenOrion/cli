@@ -1173,7 +1173,7 @@ prod = ["cadquery @ git+https://github.com/CadQuery/cadquery@master"]
 type = "git"
 url = "https://github.com/OpenOrion/jupyter-cadquery.git"
 reference = "HEAD"
-resolved_reference = "f16add4a88a1cbe40c6abd7170dfad54c712b4c6"
+resolved_reference = "fb603d707afd1fe345adc7414e6755dff3e0b935"
 
 [[package]]
 name = "jupyter-client"

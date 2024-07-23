@@ -276,8 +276,11 @@ class CadHelper:
             return LRUCache(maxsize=cache_size, getsizeof=get_size)
 
     @staticmethod
-    def get_viewer(cad_obj, cache_path: Union[Path, str, None] = None):
-        from jupyter_cadquery.viewer import show
+    def get_viewer(cad_obj, cache_path: Union[Path, str, None] = None, remote_viewer: bool = False):
+        if remote_viewer:
+            from jupyter_cadquery.viewer import show
+        else:
+            from jupyter_cadquery import show
         from jupyter_cadquery.tessellator import create_cache
 
         if cache_path and Path(cache_path).exists():
@@ -286,7 +289,7 @@ class CadHelper:
         else:
             cache = create_cache()
                 # print(tess.cache)   
-        viewer = show(cad_obj, cache=cache)
+        viewer = show(cad_obj, cache=cache, viewer=None)
 
         if cache_path:
             CadHelper.save_cache(cache, cache_path)

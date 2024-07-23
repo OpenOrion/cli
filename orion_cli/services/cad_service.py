@@ -318,10 +318,9 @@ class CadService:
 
     @staticmethod
     def write_project(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
-        logger.info(f"\n\nWriting project to {project_path}")
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
 
-        if not verbose:
-            logger.setLevel(logging.ERROR)
+        logger.info(f"\n\nWriting project to {project_path}")
 
         project_path = Path(project_path)
         project_path.mkdir(parents=True, exist_ok=True)
@@ -400,8 +399,7 @@ class CadService:
 
     @staticmethod
     def revise_project(project_path: Path, cad_path: Path, write=False, project_options: Optional[ProjectOptions] = None, verbose=False):
-        if not verbose:
-            logger.setLevel(logging.ERROR)
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
 
         prev_project = CadService.read_project(project_path)
 
@@ -415,6 +413,7 @@ class CadService:
 
         if write:
             CadService.write_project(project_path, revised_project, verbose=verbose)
+        
         return revised_project
 
     @staticmethod
@@ -446,8 +445,20 @@ class CadService:
         return project
 
     @staticmethod
-    def visualize_project(project_path: Union[Path, str]):
-        from jupyter_cadquery.viewer import show
+    def visualize_project(project_path: Union[Path, str], remote_viewer=False, export_html=True, verbose=True):
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
+
         project_path = Path(project_path)
         project = CadService.read_project(project_path)
-        show(project.root_assembly.to_cq(project))
+
+        cq_assembly = project.root_assembly.to_cq(project)
+
+        orion_cache_path = project_path / ".orion_cache"
+        orion_cache_path.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Generating visualization")
+        viewer = CadHelper.get_viewer(cq_assembly, orion_cache_path / "tesselation.cache", remote_viewer)
+        
+        if viewer and export_html:
+            viewer.export_html(str(orion_cache_path / "index.html"))
+            logger.info(f"Exported HTML to {orion_cache_path / 'index.html'}, open in browser to view")

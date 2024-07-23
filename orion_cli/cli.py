@@ -15,23 +15,69 @@ def cli():
     """Command-line tool for Open Orion PLM"""
 
 @cli.command(name="create")
-@click.option(
-    "--name", prompt="Please enter the project name",
-    help="The name of the project"
-)
-@click.option(
-    "--path", default=".", prompt="Please enter the directory where the project will be created",
-    help="The directory where the project will be created", type=CustomPath(exists=True)
-)
-@click.option(
-    "--step-file", type=CustomPath(exists=True), prompt="Please enter the path for a step file (CAD/3D) to be processed with the tool",
-    help="The path for a step file (CAD/3D) to be processed with the tool", required=False
-)
-def create_command(name: str, path: str, cad_path: str):
+@click.option("--name", help="The name of the project", required=False)
+@click.option("--cad_path", help="The path for a step file (CAD/3D) to be processed with the tool", type=click.Path(), required=False)
+@click.option("--remote_url", help="The URL of the remote repository", required=False, default=None)
+def create_command(name: str, cad_path: str, remote_url: str):
     """Create a new project"""
+    from pathlib import Path
     from orion_cli.services.create_service import CreateService
+    from orion_cli.helpers.remote_helper import RemoteHelper
+    import shutil
+
+    project_path = Path.cwd()
+
+
+    name = click.prompt("Please enter the project name")
+
+    full_project_path = project_path / name
+
+    if full_project_path.exists():
+        click.echo(f"Project '{name}' already exists at {full_project_path}")
+        overwrite = click.confirm("Would you like to overwrite it?", default=False)
+        if not overwrite:
+            click.echo("Exiting without creating project.")
+            return
+        # Remove the project directory and its contents
+        shutil.rmtree(full_project_path)
+
+
+    # Prompt the user for inputs if not provided
+    if not cad_path:
+        cad_path = click.prompt("Please enter the path for a step file (CAD/3D) to be processed with the tool", type=click.Path(exists=True))
+
+    if not remote_url:
+        provide_remote_url = click.confirm("Would you like to provide the URL of the remote repository?", default=False)
+        if not provide_remote_url:
+            pass
+        else:
+            remote_url = click.prompt("Please enter the URL of the remote repository")
+
+    if remote_url:
+        # Check if the remote repository is valid and accessible
+        valid_url = RemoteHelper.get_valid_remote_url(remote_url)
+        if valid_url is None:
+            print("Continuing without a remote repository.")
+        else:
+            print(f"Using remote repository: {valid_url}")
+        remote_url = valid_url
+
+    # Resolve the paths to ensure they are absolute
+    cad_path = Path(cad_path).resolve()
+
+    # Create the project
     service = CreateService()
-    service.create(name, path, cad_path)
+    try:
+        service.create(name, str(project_path), str(cad_path), remote_url)
+        click.echo(f"Project '{name}' has been created/updated at {project_path / name}")
+        click.echo(f"Original CAD file: {cad_path}")
+        click.echo(f"A copy of the CAD file has been stored in the project directory.")
+        click.echo("Project configuration has been created and saved.")
+    except Exception as e:
+        click.echo(f"Error creating/updating project: {e}")
+        return
+
+    click.echo("Project creation/update completed successfully.")
 
 @cli.command(name="config")
 def config_command():
@@ -53,11 +99,11 @@ def config_command():
     "--commit-message", default="Updated project structure", prompt="Please enter the commit message",
     help="The commit message for the revision"
 )
-def revision_command(project_path: str, step_file: str, commit_message: str):
+def revision_command(project_path: str, cad_path: str, commit_message: str):
     """Update the project structure and commit the changes"""
     from orion_cli.services.revision_service import RevisionService
     service = RevisionService()
-    service.revision(project_path, step_file, commit_message)
+    service.revision(project_path, cad_path, commit_message)
 
 @cli.command(name="sync")
 @click.option(

@@ -321,8 +321,14 @@ class CadService:
                 f.write(assembly.model_dump_json(indent=4))
     
     @staticmethod
-    def create_project(project_path: Path, step_file: Optional[Path] = None):
+    def create_project(
+        project_path: Path,
+        step_file: Optional[Path] = None,
+        project_options: Optional[ProjectOptions] = None
+    ):
         project = Project()
+        if project_options:
+            project.options = project_options
         if step_file:
             # Create the new directory
             click.echo(f"Loading in step file {step_file}")

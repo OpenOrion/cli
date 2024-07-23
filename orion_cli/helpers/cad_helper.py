@@ -1,21 +1,25 @@
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
-from typing import Optional, Union
+import pickle
+from typing import Optional, Union, cast
+from cachetools import LRUCache
 import numpy as np
 from OCP.GProp import GProp_GProps
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS, TopoDS_Solid
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 from OCP.gp import gp_Trsf
 from OCP.BRepTools import BRepTools
 from OCP.BRep import BRep_Builder, BRep_Tool
 import cadquery as cq
 from OCP.BRepGProp import BRepGProp
-from ocp_tessellate.tessellator import Tessellator, compute_quality
+from ocp_tessellate.tessellator import Tessellator, compute_quality, cache_size, get_size
 from ocp_tessellate.ocp_utils import bounding_box, get_location
 import cadquery as cq
-from orion_cli.readers.step_reader import StepReader
+from ocp_tessellate.stepreader import StepReader
 
+RotationMatrixLike = Union[np.ndarray, list[list[float]]]
+VectorLike = Union[np.ndarray, list[float]]
 
 @dataclass
 class Mesh:
@@ -59,13 +63,13 @@ class CadHelper:
 
     @staticmethod
     def transform_solid(
-        solid: cq.Solid, orientation: np.ndarray, offset: Optional[np.ndarray] = None
+        solid: cq.Solid, rotmat: RotationMatrixLike, offset: Optional[VectorLike] = None
     ):
         if offset is None:
             offset = np.zeros(3)
 
         # Get the transformation
-        loc = CadHelper.get_location(orientation, offset)
+        loc = CadHelper.get_location(rotmat, offset)
         transformation = loc.wrapped.Transformation()
 
         # Apply the transformation
@@ -73,20 +77,20 @@ class CadHelper:
         return cq.Solid(transformer.Shape())
 
     @staticmethod
-    def get_location(orientation: np.ndarray, offset: np.ndarray):
+    def get_location(rotmat: RotationMatrixLike, offset: VectorLike):
         transformation = gp_Trsf()
         transformation.SetValues(
-            orientation[0][0],
-            orientation[0][1],
-            orientation[0][2],
+            rotmat[0][0],
+            rotmat[0][1],
+            rotmat[0][2],
             offset[0],
-            orientation[1][0],
-            orientation[1][1],
-            orientation[1][2],
+            rotmat[1][0],
+            rotmat[1][1],
+            rotmat[1][2],
             offset[1],
-            orientation[2][0],
-            orientation[2][1],
-            orientation[2][2],
+            rotmat[2][0],
+            rotmat[2][1],
+            rotmat[2][2],
             offset[2],
         )
         return cq.Location(transformation)
@@ -111,12 +115,26 @@ class CadHelper:
         Import a STEP file
         Returns a TopoDS_Shape object
         """
+        file_path = Path(file_path)
         assert file_path.exists(), f"File not found: {file_path}"
         assert file_path.suffix.lower() in [".step", ".stp"], "Invalid file type"
 
         r = StepReader()
         r.load(str(file_path))
-        return r.to_cadquery()
+        return cast(cq.Assembly, r.to_cadquery())
+
+
+    @staticmethod
+    def import_cad(file_path: Union[Path, str]) -> cq.Assembly:
+        """
+        Import a CAD file
+        Returns a TopoDS_Shape object
+        """
+        file_path = Path(file_path)
+        if file_path.suffix.lower() in [".step", ".stp"]:
+            return CadHelper.import_step(file_path)
+
+        raise ValueError("Invalid file type")
 
     @staticmethod
     def export_brep(shape: TopoDS_Shape, file_path: str):
@@ -208,19 +226,7 @@ class CadHelper:
         # Singular Value Decomposition (SVD)
         U, S, Vt = np.linalg.svd(H)
         rotation_matrix = np.dot(Vt.T, U.T)
-
-        # Ensure the rotation matrix is proper (determinant should be +1)
-        # if np.linalg.det(rotation_matrix) < 0:
-        #     Vt[2, :] *= -1
-        #     rotation_matrix = np.dot(Vt.T, U.T)
-            # print(np.linalg.det(rotation_matrix))
-
-        # Rotate vertices2 to align with vertices1
-        # aligned_vertices2 = np.dot(vertices2_centered, rotation_matrix)
-
-        # # Translate aligned vertices to the position of vertices1
-        # aligned_vertices2 += centroid1
-
+        
         return rotation_matrix
 
     @staticmethod
@@ -239,7 +245,8 @@ class CadHelper:
         raise ValueError(f"failed to align, error: {error}")
 
     @staticmethod
-    def get_part_checksum(solid: cq.Solid, precision=3):
+    def get_part_checksum(solid: Union[cq.Solid, TopoDS_Solid], precision=3):
+        solid = solid if isinstance(solid, cq.Solid) else cq.Solid(solid)
 
         vertices = np.array(
             [CadHelper.vertex_to_Tuple(TopoDS.Vertex_s(v)) for v in solid._entities("Vertex")]
@@ -253,3 +260,34 @@ class CadHelper:
         vertices_hash = hashlib.md5(sorted_vertices.tobytes()).digest()
         return hashlib.md5(vertices_hash).hexdigest()
 
+    @staticmethod
+    def save_cache(cache: LRUCache, path: Union[str, Path]):
+        with open(path, 'wb') as f:
+            pickle.dump(cache, f)
+
+    # Function to load cache from a file
+    @staticmethod
+    def load_cache(path: Union[str, Path]):
+
+        try:
+            with open(path, 'rb') as f:
+                return pickle.load(f)
+        except FileNotFoundError:
+            return LRUCache(maxsize=cache_size, getsizeof=get_size)
+
+    @staticmethod
+    def get_viewer(cad_obj, cache_path: Union[Path, str, None] = None):
+        from jupyter_cadquery.viewer import show
+        from jupyter_cadquery.tessellator import create_cache
+
+        if cache_path and Path(cache_path).exists():
+            with open(cache_path, 'rb') as f:
+                cache = pickle.load(f)
+        else:
+            cache = create_cache()
+                # print(tess.cache)   
+        viewer = show(cad_obj, cache=cache)
+
+        if cache_path:
+            CadHelper.save_cache(cache, cache_path)
+        return viewer

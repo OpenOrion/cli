@@ -1,10 +1,10 @@
+import logging
 from pathlib import Path
 import subprocess
 from typing import Union
 import click
 
-from orion_cli.helpers.cad_helper import CadHelper
-from orion_cli.services.cad_service import AssemblyIndex, CadService, Project
+from orion_cli.services.cad_service import CadService
 from .base_service import BaseService
 
 class RevisionService(BaseService):
@@ -17,7 +17,7 @@ class RevisionService(BaseService):
 
         try:
             # Regenerate the project structure
-            CadService.revise_project(project_path, cad_path, write=True)
+            CadService.revise_project(project_path, cad_path, write=True, verbose=True)
 
             # Git add and commit
             subprocess.run(["git", "add", "."], cwd=project_path, check=True)

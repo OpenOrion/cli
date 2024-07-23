@@ -1,6 +1,6 @@
 from pathlib import Path
 import subprocess
-from typing import Union
+from typing import Optional, Union
 import click
 import yaml
 import shutil
@@ -10,10 +10,11 @@ from orion_cli.helpers.config_helper import ProjectConfig
 from .base_service import BaseService
 
 class CreateService(BaseService):
-    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: str):
+    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None):
         """Create a new project"""
+        
         project_path = Path(path) / name
-        cad_path = Path(cad_path)
+        cad_path = Path(cad_path).resolve()
 
         try:
             click.echo(f"Creating project '{name}' at {project_path}")
@@ -21,8 +22,9 @@ class CreateService(BaseService):
             # Create the project using CadService
             CadService.create_project(
                 project_path=project_path,
-                step_file=cad_path,
-                project_options=ProjectOptions()  #
+                cad_file=cad_path,
+                project_options=ProjectOptions(),
+                verbose=True
             )
 
             # Copy CAD file to project directory
@@ -46,8 +48,7 @@ class CreateService(BaseService):
             click.echo(f"Configuration file created at {config_path}")
 
             # Initialize a new Git repository
-            subprocess.run(["git", "init"], cwd=project_path, check=True)
-
+            subprocess.run(["git", "init", "--initial-branch=main"], cwd=project_path, check=True)
             # Path to the template .gitignore file
             template_gitignore_path = Path(__file__).resolve().parent.parent / 'templates' / 'gitignore_template'
 

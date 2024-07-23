@@ -245,11 +245,28 @@ dev = ["bumpversion", "pydoc3", "twine"]
 
 [[package]]
 name = "cadquery"
-version = "2.5.0.dev0"
+version = "2.4.0"
 description = "CadQuery is a parametric  scripting language for creating and traversing CAD models"
 optional = false
-python-versions = "*"
-files = []
+python-versions = ">=3.8"
+files = [
+    {file = "cadquery-2.4.0-py3-none-any.whl", hash = "sha256:66c865b1e5db205b81a5ddc8533d4741577291292cf2dc80b104ae9e3085b195"},
+    {file = "cadquery-2.4.0.tar.gz", hash = "sha256:38e8e302060f2e50943ab0f8acab985c37a73009e972c7b02767c90bef7fb3e7"},
+]
+
+[package.dependencies]
+cadquery-ocp = ">=7.7.0a0,<7.8"
+casadi = "*"
+ezdxf = "*"
+multimethod = "1.9.1"
+nlopt = "*"
+nptyping = "2.0.1"
+path = "*"
+typish = "*"
+
+[package.extras]
+dev = ["black (==19.10b0)", "click (==8.0.4)", "docutils", "ipython", "pytest"]
+ipython = ["ipython"]
 
 [[package]]
 name = "cadquery-arm"
@@ -268,6 +285,30 @@ ezdxf = "*"
 multimethod = "*"
 path = "*"
 typish = "*"
+
+[[package]]
+name = "cadquery-ocp"
+version = "7.7.2"
+description = "OCP+VTK wheel with shared library dependencies bundled."
+optional = false
+python-versions = "*"
+files = [
+    {file = "cadquery_ocp-7.7.2-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:7f2faf716855f9a8372493e001e6e318da75b046472e7ee69881d2a4e6b65a04"},
+    {file = "cadquery_ocp-7.7.2-cp310-cp310-manylinux_2_35_x86_64.whl", hash = "sha256:35e2c8ca923e4ba77b833357eb14c7e8a939f17285ef6acde7c26961989a8dfe"},
+    {file = "cadquery_ocp-7.7.2-cp310-cp310-win_amd64.whl", hash = "sha256:4fc230711d52a9e7d71ab4c79c957287c7f2f85e5f09e036b573e6851df4d1ba"},
+    {file = "cadquery_ocp-7.7.2-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:488401fa4d070e3eb17729fb8b6494bd3577f0913c4e901e674c4d8fcd9ac1fe"},
+    {file = "cadquery_ocp-7.7.2-cp311-cp311-manylinux_2_35_x86_64.whl", hash = "sha256:2be9408551c03e1c715e3b158b41ce458178ecf530ba644e3e884a5989feb611"},
+    {file = "cadquery_ocp-7.7.2-cp311-cp311-win_amd64.whl", hash = "sha256:8e1f90250924ac50344bf0867e3d9a927f077583351b270b4e0e171033dd2046"},
+    {file = "cadquery_ocp-7.7.2-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:78a7903267cd9986181b634a315ca66fac1bb9e6dbfaf60724d812b3a2cc77bf"},
+    {file = "cadquery_ocp-7.7.2-cp312-cp312-manylinux_2_35_x86_64.whl", hash = "sha256:7ac2d83b4f4b3d7c35421a1d9f8fec2adc73b6ed6cac50c1ffcede5552e38e9b"},
+    {file = "cadquery_ocp-7.7.2-cp312-cp312-win_amd64.whl", hash = "sha256:d9e5c8ef5aeb1d3fb8f0b207ed1a2b781d22dc3e9b9c0551f52342f5a6ee7fc5"},
+    {file = "cadquery_ocp-7.7.2-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:7134e629559ba110a4d0cda53cb6a30c0af52524f7a6151e772d4b720ef508be"},
+    {file = "cadquery_ocp-7.7.2-cp38-cp38-manylinux_2_35_x86_64.whl", hash = "sha256:73183f141514e507c45a1e4ba1d25f1fdc604b20dd42bed7c8168f468632686b"},
+    {file = "cadquery_ocp-7.7.2-cp38-cp38-win_amd64.whl", hash = "sha256:9e40840e1f4da5e0a8f1eb2168efc33ae65ac8e046c27a49936a2e9931fc1711"},
+    {file = "cadquery_ocp-7.7.2-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:3f6750c84f8af930f366ad22397141f3c332c39fb826edf3fe26c4e6938690f7"},
+    {file = "cadquery_ocp-7.7.2-cp39-cp39-manylinux_2_35_x86_64.whl", hash = "sha256:9f6c601d1db66353f0ef7c63fde70411573e917c16fb4c7cb5d92ed85b72f154"},
+    {file = "cadquery_ocp-7.7.2-cp39-cp39-win_amd64.whl", hash = "sha256:feea223eaa2dfa33684f568b5ba2b02c35e96b5d894014f98927b5c08041a6be"},
+]
 
 [[package]]
 name = "cadquery-ocp-arm"
@@ -1771,13 +1812,13 @@ files = [
 
 [[package]]
 name = "multimethod"
-version = "1.12"
+version = "1.9.1"
 description = "Multiple argument dispatching."
 optional = false
-python-versions = ">=3.9"
+python-versions = ">=3.7"
 files = [
-    {file = "multimethod-1.12-py3-none-any.whl", hash = "sha256:fd0c473c43558908d97cc06e4d68e8f69202f167db46f7b4e4058893e7dbdf60"},
-    {file = "multimethod-1.12.tar.gz", hash = "sha256:8db8ef2a8d2a247e3570cc23317680892fdf903d84c8c1053667c8e8f7671a67"},
+    {file = "multimethod-1.9.1-py3-none-any.whl", hash = "sha256:52f8f1f2b9d5a4c7adfdcc114dbeeebe3245a4420801e8807e26522a79fb6bc2"},
+    {file = "multimethod-1.9.1.tar.gz", hash = "sha256:1589bf52ca294667fd15527ea830127c763f5bfc38562e3642591ffd0fd9d56f"},
 ]
 
 [[package]]
@@ -1893,6 +1934,36 @@ files = [
 ]
 
 [[package]]
+name = "nlopt"
+version = "2.7.1"
+description = "Library for nonlinear optimization, wrapping many algorithms for global and local, constrained or unconstrained, optimization"
+optional = false
+python-versions = ">=3.6"
+files = [
+    {file = "nlopt-2.7.1-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:42b7883704e1285ff40d930699eb7fc7e1341229da33666b4163459cfdf89fb1"},
+    {file = "nlopt-2.7.1-cp310-cp310-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:6ba0862162248442fbf1f04b20a321c11ff40ff4442a12aaaafcdaff9abb0ab7"},
+    {file = "nlopt-2.7.1-cp310-cp310-win_amd64.whl", hash = "sha256:426c18548d733640449d707c82eb57c09a5f01d4b064f87312808d194d227f24"},
+    {file = "nlopt-2.7.1-cp311-cp311-macosx_10_9_x86_64.whl", hash = "sha256:7a12fe3cbfb36a6a18f84a1ac23ed3dda323860235381b3d2d182d8b771783ef"},
+    {file = "nlopt-2.7.1-cp311-cp311-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:3e1653de0060a42d6709423e6160888893bb688f4ff79aa0f1def4701ea25dd8"},
+    {file = "nlopt-2.7.1-cp311-cp311-win_amd64.whl", hash = "sha256:88ec7cf491da150d497ecc61889bc7adb0af0ad05a67e925a4f5ac88e20f1b9c"},
+    {file = "nlopt-2.7.1-cp312-cp312-macosx_10_9_x86_64.whl", hash = "sha256:da0ac81b10f838afe7c1b99a2f895c31e05ca68328571fe430f382ce08cbfb07"},
+    {file = "nlopt-2.7.1-cp312-cp312-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:592ded3b34bb888cd99c5da3fb1c3c9269ddd996dade578a8ec325cd8b6be752"},
+    {file = "nlopt-2.7.1-cp312-cp312-win_amd64.whl", hash = "sha256:1647131d53302e72f5c4851ab04a92401a342c3e0fcfaac0eda316f5e8f3b283"},
+    {file = "nlopt-2.7.1-cp37-cp37m-macosx_10_9_x86_64.whl", hash = "sha256:79791a2179d1cf708622eaeea76c88acbadc6af0d2f198df21a74473838686c3"},
+    {file = "nlopt-2.7.1-cp37-cp37m-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:aad38bab99348f6c3bbf0d5f339b3fd77465b27ef44c330f4ba512a40b87b373"},
+    {file = "nlopt-2.7.1-cp37-cp37m-win_amd64.whl", hash = "sha256:479a415f522051f6d728a3279c013aab96a6eaf3c323a89582dcb07eb636f15f"},
+    {file = "nlopt-2.7.1-cp38-cp38-macosx_10_9_x86_64.whl", hash = "sha256:d99f1d6217bc3ead6fa6fe84a923577003f9a5f760cd354a3f8dcd1e11d626ce"},
+    {file = "nlopt-2.7.1-cp38-cp38-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:33f9370bd37788b4ac792cf161835f1e4e9bbad8bfb5a76f75a295ae38dcd8d0"},
+    {file = "nlopt-2.7.1-cp38-cp38-win_amd64.whl", hash = "sha256:8e7b65cf3a751e822b02f28b65d0c548052523fa6333619af3f24fec60a6b6bd"},
+    {file = "nlopt-2.7.1-cp39-cp39-macosx_10_9_x86_64.whl", hash = "sha256:087ff54de5ec0375fd18f843b36e9a8590c0f1e194bb45d3119ba844aeb836dd"},
+    {file = "nlopt-2.7.1-cp39-cp39-manylinux_2_17_x86_64.manylinux2014_x86_64.whl", hash = "sha256:b4a05448f0ffebbab7a6a822297430e018c848652280e6efa13484e210291d5c"},
+    {file = "nlopt-2.7.1-cp39-cp39-win_amd64.whl", hash = "sha256:757c41210f3ab6173e5c508c79c7833e33cf90a068d098b1e13d277432120b81"},
+]
+
+[package.dependencies]
+numpy = ">=1.14"
+
+[[package]]
 name = "notebook"
 version = "6.5.7"
 description = "A web-based notebook environment for interactive computing"
@@ -1942,6 +2013,24 @@ jupyter-server = ">=1.8,<3"
 
 [package.extras]
 test = ["pytest", "pytest-console-scripts", "pytest-jupyter", "pytest-tornasync"]
+
+[[package]]
+name = "nptyping"
+version = "2.0.1"
+description = "Type hints for NumPy."
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "nptyping-2.0.1-py3-none-any.whl", hash = "sha256:0fc5c4d76c65e12a77e750b9e2701dab6468d00926c8c4f383867bd70598a532"},
+]
+
+[package.dependencies]
+numpy = ">=1.20.0"
+
+[package.extras]
+build = ["codecov (>=2.1.0)", "invoke (>=1.6.0)", "pip-tools (>=6.5.0)"]
+dev = ["autoflake", "beartype (<0.10.0)", "beartype (>=0.10.0)", "black", "codecov (>=2.1.0)", "coverage", "invoke (>=1.6.0)", "isort", "mypy", "pip-tools (>=6.5.0)", "pylint", "setuptools", "typeguard", "wheel"]
+qa = ["autoflake", "beartype (<0.10.0)", "beartype (>=0.10.0)", "black", "coverage", "isort", "mypy", "pylint", "setuptools", "typeguard", "wheel"]
 
 [[package]]
 name = "numpy"

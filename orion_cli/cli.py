@@ -100,6 +100,7 @@ def revision_command(project_path: Union[str, Path], cad_path: str):
         if not config.cad_path or not Path(config.cad_path).is_file():
             click.echo("Invalid CAD path provided in config.")
             return
+        cad_path = config.cad_path
 
     service = RevisionService()
     service.revision(project_path, cad_path, config.options)

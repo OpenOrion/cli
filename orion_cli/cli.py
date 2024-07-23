@@ -18,7 +18,8 @@ def cli():
 @click.option("--name", help="The name of the project", required=False)
 @click.option("--cad_path", help="The path for a step file (CAD/3D) to be processed with the tool", type=click.Path(), required=False)
 @click.option("--remote_url", help="The URL of the remote repository", required=False, default=None)
-def create_command(name: str, cad_path: str, remote_url: Optional[str]):
+@click.option("--include_assets", help="Include assets in the project", is_flag=True)
+def create_command(name: str, cad_path: str, remote_url: Optional[str], include_assets: bool):
     """Create a new project"""
     from pathlib import Path
     from orion_cli.services.create_service import CreateService
@@ -65,7 +66,7 @@ def create_command(name: str, cad_path: str, remote_url: Optional[str]):
     # Create the project
     service = CreateService()
     try:
-        service.create(name, project_path, cad_path, remote_url)
+        service.create(name, project_path, cad_path, remote_url, include_assets)
         logger.info(f"Project '{name}' has been created/updated at {project_path / name}")
         logger.info(f"Original CAD file: {cad_path}")
         logger.info(f"CAD file has been copied in the project directory.")

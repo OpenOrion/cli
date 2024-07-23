@@ -5,12 +5,14 @@ import click
 import yaml
 import shutil
 
-from orion_cli.services.cad_service import CadService, ProjectOptions
+from orion_cli.services.cad_service import CadService, ProjectOptions, MAIN_ASSEMBLY_NAME
 from orion_cli.helpers.config_helper import ProjectConfig
+from orion_cli.templates.README_template import README_TEMPLATE
+from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
 from .base_service import BaseService
 
 class CreateService(BaseService):
-    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None):
+    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None, include_assets: bool = True):
         """Create a new project"""
         
         project_path = Path(path) / name
@@ -23,7 +25,7 @@ class CreateService(BaseService):
             CadService.create_project(
                 project_path=project_path,
                 cad_file=cad_path,
-                project_options=ProjectOptions(),
+                project_options=ProjectOptions(include_assets=include_assets),
                 verbose=True
             )
 
@@ -50,14 +52,13 @@ class CreateService(BaseService):
             # Initialize a new Git repository
             subprocess.run(["git", "init", "--initial-branch=main"], cwd=project_path, check=True)
             # Path to the template .gitignore file
-            template_gitignore_path = Path(__file__).resolve().parent.parent / 'templates' / 'gitignore_template'
 
             # Read the content of the template .gitignore file
-            gitignore_content = template_gitignore_path.read_text()
-
+            gitignore_content = GITIGNORE_TEMPLATE
+            readme_content = README_TEMPLATE(name, MAIN_ASSEMBLY_NAME)
             # Write the content to the new project's .gitignore file
             (project_path / ".gitignore").write_text(gitignore_content)
-
+            (project_path / "README.md").write_text(readme_content)
             click.echo("Git repository initialized and .gitignore file created.")
 
             # Make initial commit

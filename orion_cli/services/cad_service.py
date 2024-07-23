@@ -28,6 +28,7 @@ class InventoryItem(BaseModel):
     name: str
     price: Optional[float] = None
 
+MAIN_ASSEMBLY_NAME = "MAIN_ASM"
 
 @dataclass
 class Inventory:
@@ -92,6 +93,7 @@ class ProjectOptions(BaseModel):
     max_name_depth: int = 3
     normalize_axis: bool = False
     use_references: bool = True
+    include_assets: bool = False
 
 @dataclass
 class Project:
@@ -189,6 +191,7 @@ class CadService:
     @staticmethod
     def assign_unique_part_names(part_ref: PartRef, project: Project, index: AssemblyIndex):
         part_name = part_ref.name
+        assert part_name != MAIN_ASSEMBLY_NAME, f"part name {part_name} is reserved for main assembly"
         # check if part name already exists
         if part_name in index.part_names:
             prev_part_ref = index.part_names[part_name]
@@ -352,17 +355,28 @@ class CadService:
                 logger.info(f"- Exported part '{part_name}'")
 
             # Generate SVGs for each part if they are modified or don't exist
-            svg_path = assets_path / f"{part_name}.svg"
-            if not index or index and checksum in index.is_part_modified or not svg_path.exists():
-                logger.info(f"- Generating SVG for part '{part_name}'")
-                svg = getSVG(part, {"showAxes": False, "marginLeft": 20})
-                with open(svg_path, "w") as f:
+            if project.options.include_assets:
+                svg_path = assets_path / f"{part_name}.svg"
+                if not index or index and checksum in index.is_part_modified or not svg_path.exists():
+                    logger.info(f"- Generating SVG for part '{part_name}'")
+                    svg = getSVG(part, {"showAxes": False, "marginLeft": 20})
+                    with open(svg_path, "w") as f:
+                        f.write(svg)
+
+        if project.options.include_assets:
+            logger.info("- Generating SVG for main assembly, this might take a sec ...")
+            if index is None or project.root_assembly.path in index.is_assembly_modified:
+                cq_assembly = project.root_assembly.to_cq(project)
+                cq_comp = cq_assembly.toCompound()
+                svg = getSVG(cq_comp, {"showAxes": False, "marginLeft": 20})
+                with open(assets_path / f"{MAIN_ASSEMBLY_NAME}.svg", "w") as f:
                     f.write(svg)
 
-        # Remove any svg files that are not in the inventory (removed)
-        for svg_path in assets_path.glob("*.svg"):
-            if svg_path.stem not in part_names:
-                svg_path.unlink()
+            logger.info("- Removing SVG files not in inventory")
+            for svg_path in assets_path.glob("*.svg"):
+                if svg_path.stem not in part_names and svg_path.stem != MAIN_ASSEMBLY_NAME:
+                    svg_path.unlink()
+
 
         with open(inventory_path / "README.md", "w") as f:
             f.write(CadService.inventory_markdown(project.inventory, assets_path.relative_to(project_path)))

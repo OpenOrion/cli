@@ -5,14 +5,16 @@ from pathlib import Path
 from typing import Optional, OrderedDict, Sized, Union, cast
 import numpy as np
 import cadquery as cq
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 from scipy.spatial.transform import Rotation as R
 import shutil
 import cadquery as cq
 from orion_cli.helpers.cad_helper import CadHelper
 from cadquery.occ_impl.exporters.svg import getSVG
 import pandas as pd
+from orion_cli.helpers.numpy_helper import NdArray
 from orion_cli.services.log_service import logger
+from OCP.gp import gp_Trsf
 
 # Parameter Labels
 PartSurfaceArea = float
@@ -70,8 +72,58 @@ class Inventory:
         else:
             return 0
 class Location(BaseModel):
-    position: list[float]
-    orientation: list[list[float]]
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    position: NdArray
+    orientation: NdArray
+
+    def to_cq(self):
+        transformation = gp_Trsf()
+        transformation.SetValues(
+            self.orientation[0][0],
+            self.orientation[0][1],
+            self.orientation[0][2],
+            self.position[0],
+            self.orientation[1][0],
+            self.orientation[1][1],
+            self.orientation[1][2],
+            self.position[1],
+            self.orientation[2][0],
+            self.orientation[2][1],
+            self.orientation[2][2],
+            self.position[2],
+        )
+        return cq.Location(transformation)
+
+    @property
+    def is_zero(self):
+        return np.all(self.position == 0) and np.all(self.orientation == np.eye(3))
+
+    def transform(self, location: Union["Location", cq.Location, None]):
+        if location is None:
+            return self.model_copy()
+        
+        if isinstance(location, cq.Location):
+            location = Location.convert(location)
+
+        return Location(
+            position=self.position + location.position,
+            orientation=self.orientation.dot(location.orientation)
+        )
+
+    @staticmethod
+    def convert(loc: Union["Location", cq.Location, None]):
+        if loc is None:
+            return Location(position=np.zeros(3), orientation=np.eye(3))
+        if isinstance(loc, Location):
+            return loc
+        translation, euler_angles = loc.toTuple()
+        rotmat = R.from_euler("xyz", euler_angles, degrees=True).as_matrix()
+
+        return Location(
+            position=np.array(translation),
+            orientation=(rotmat)
+        )
+
 
 class PartRef(BaseModel):
     """
@@ -79,7 +131,7 @@ class PartRef(BaseModel):
     """
     path: str
     variation: InventoryVariationRef
-    location: Location
+    location: Optional[Location] = None
 
     @property
     def name(self):
@@ -91,6 +143,7 @@ class Assembly(BaseModel):
     Assembly of parts and subassemblies as references
     """
     path: AssemblyPath
+    location: Optional[Location] = None
     children: list[AssemblyPath] = Field(default_factory=list)
     parts: list[PartRef] = Field(default_factory=list)
 
@@ -101,23 +154,25 @@ class Assembly(BaseModel):
     def name(self):
         return self.path.split("/")[-1]
 
-    def to_cq(self, project: "Project"):
+    def to_cq(self, project: "Project", abs_location: Optional[Location] = None):
         cq_assembly = cq.Assembly(name=self.name)
         for subassembly_path in self.children:
             subassembly = project.assemblies[subassembly_path]
-            cq_assembly.add(subassembly.to_cq(project), name=subassembly.name)
+            asm_abs_location = Location.convert(subassembly.location).transform(abs_location) 
+            cq_assembly.add(subassembly.to_cq(project), loc=asm_abs_location.to_cq(),name=subassembly.name)
         for part_ref in self.parts:
             part = project.inventory.parts[part_ref.variation.checksum]
-            loc = CadHelper.get_location(part_ref.location.orientation, part_ref.location.position)
+            cq_loc = part_ref.location and part_ref.location.to_cq()
             part_variation = project.inventory.get_variation(part_ref.variation)
 
             # TODO: find a better solution to handle negative rotation determinants (mirrors)
-            if loc.wrapped.Transformation().IsNegative():
-                aligned_part = CadHelper.transform_solid(part, part_ref.location.orientation, part_ref.location.position)
+            if cq_loc and cq_loc.wrapped.Transformation().IsNegative():
+                part_abs_location = Location.convert(part_ref.location).transform(abs_location)
+                aligned_part = CadHelper.transform_solid(part, part_abs_location.orientation, part_abs_location.position)
                 cq_assembly.add(aligned_part, color=cq.Color(*part_variation.color), name=part_ref.name)
             else:
                 cq_assembly.add(
-                    part, color=cq.Color(*part_variation.color), name=part_ref.name, loc=loc
+                    part, color=cq.Color(*part_variation.color), name=part_ref.name, loc=cq_loc
                 )
 
         return cq_assembly
@@ -163,6 +218,7 @@ class CadService:
         cq_assembly: cq.Assembly,
         project: Optional[Project] = None,
         index: Optional[AssemblyIndex] = None,
+        curr_abs_location: Optional[Location] = None,
         curr_path: str = "",
     ):
         if project is None:
@@ -173,7 +229,13 @@ class CadService:
             index.is_assembly_modified.clear()
             index.is_part_modified.clear()
 
-        root_assembly = Assembly(path=curr_path + f"/{cq_assembly.name}")
+        rel_location = Location.convert(cq_assembly.loc)
+        root_assembly = Assembly(
+            path=curr_path + f"/{cq_assembly.name}",
+            location=rel_location if not rel_location.is_zero else None,
+        )
+        abs_location = rel_location.transform(curr_abs_location)
+
         assemblies = [root_assembly]
         project.assemblies[root_assembly.path] = root_assembly
 
@@ -184,6 +246,7 @@ class CadService:
                     cq_subassembly,
                     project,
                     index,
+                    abs_location,
                     root_assembly.path,
                 )
                 root_assembly.add_child(subassemblies[0])
@@ -194,7 +257,7 @@ class CadService:
                     index.is_assembly_modified.add(root_assembly.path)
             else:
                 base_part, part_ref = CadService.get_part(
-                    cq_subassembly, root_assembly.path, project.inventory, index, project.options
+                    cq_subassembly, root_assembly.path, abs_location, project.inventory, index, project.options
                 )
 
                 is_modified = not(
@@ -274,6 +337,7 @@ class CadService:
     def get_part(
         cq_subassembly: cq.Assembly,
         assembly_path: str,
+        abs_location: Optional[Location] = None,
         inventory: Optional[Inventory] = None,
         index: Optional[AssemblyIndex] = None,
         options: Optional[ProjectOptions] = None,
@@ -285,28 +349,23 @@ class CadService:
             return CadService.get_referenced_part(cq_subassembly, assembly_path, inventory)
         else:
             normalize_axis=options is not None and options.normalize_axis
-            return CadService.get_non_reference_part(cq_subassembly, assembly_path, inventory, index, normalize_axis)
+            return CadService.get_non_reference_part(cq_subassembly, assembly_path, abs_location, inventory, index, normalize_axis)
 
     @staticmethod
     def get_referenced_part(cq_subassembly: cq.Assembly, assembly_path: str, inventory: Optional[Inventory] = None):
         base_part = cast(cq.Solid, cast(cq.Workplane, cq_subassembly.obj).val())
-        translation, euler_angles = cq_subassembly.loc.toTuple()
-        rotmat = R.from_euler("xyz", euler_angles, degrees=True).as_matrix()
         part_checksum = CadHelper.get_part_checksum(base_part)
         
         part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
         variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 0
-
+        location = Location.convert(cq_subassembly.loc)
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
             variation=InventoryVariationRef(
                 checksum=part_checksum, 
                 id=variation_id
             ),
-            location=Location(
-                position=list(translation),
-                orientation=rotmat.tolist(),
-            )
+            location=location if not location.is_zero else None
         )
         return base_part, part_ref
 
@@ -314,13 +373,18 @@ class CadService:
     def get_non_reference_part(
         cq_subassembly: cq.Assembly, 
         assembly_path: str, 
+        abs_location: Optional[Location] = None,
         inventory: Optional[Inventory] = None, 
         index: Optional[AssemblyIndex] = None, 
         normalize_axis: bool = False
     ):
         if index is None:
             index = AssemblyIndex()
-        aligned_part = cast(cq.Solid, cast(cq.Workplane, cq_subassembly.obj).val()).located(cq_subassembly.loc)
+        
+        # TODO: check if this is correct
+        part_rel_location = Location.convert(cq_subassembly.loc)
+        part_abs_location = part_rel_location.transform(abs_location)
+        aligned_part = cast(cq.Solid, cast(cq.Workplane, cq_subassembly.obj).val()).located(part_abs_location.to_cq())
 
         # check if part has been aligned before
         if normalize_axis:
@@ -361,8 +425,8 @@ class CadService:
                 id=variation_id
             ),
             location=Location(
-                position=offset.tolist(),
-                orientation=rotmat.tolist(),
+                position=offset,
+                orientation=rotmat,
             )
         )
 

@@ -77,26 +77,6 @@ class CadHelper:
         return cq.Solid(transformer.Shape())
 
     @staticmethod
-    def get_location(rotmat: RotationMatrixLike, offset: VectorLike):
-        transformation = gp_Trsf()
-        transformation.SetValues(
-            rotmat[0][0],
-            rotmat[0][1],
-            rotmat[0][2],
-            offset[0],
-            rotmat[1][0],
-            rotmat[1][1],
-            rotmat[1][2],
-            offset[1],
-            rotmat[2][0],
-            rotmat[2][1],
-            rotmat[2][2],
-            offset[2],
-        )
-        return cq.Location(transformation)
-
-
-    @staticmethod
     def import_brep(file_path: Union[Path, str]):
         """
         Import a boundary representation model

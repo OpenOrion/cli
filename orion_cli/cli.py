@@ -7,7 +7,6 @@ from orion_cli.services.display_service import DisplayService
 from orion_cli.services.log_service import logger
 from typing import Optional
 
-CACHE_FILE_PATH = 'cadquery_run.cache'
 
 @click.group()
 @click.version_option()
@@ -18,7 +17,7 @@ def cli():
 @click.option("--name", help="The name of the project", required=False)
 @click.option("--cad_path", help="The path for a step file (CAD/3D) to be processed with the tool", type=click.Path(), required=False)
 @click.option("--remote_url", help="The URL of the remote repository", required=False, default=None)
-@click.option("--include_assets", help="Include assets in the project", is_flag=True)
+@click.option("--include_assets", help="Include assets in the project", is_flag=False)
 def create_command(name: str, cad_path: str, remote_url: Optional[str], include_assets: bool):
     """Create a new project"""
     from pathlib import Path
@@ -213,24 +212,6 @@ def deploy_command(deploy_msg: Optional[str|None] = None):
     service = DeployService()
     service.deploy(deploy_msg or "")
 
-@cli.command(name="test_cadquery")
-def test_cadquery_command():
-    """Test CadQuery by creating and displaying a basic shape"""
-    if not os.path.exists(CACHE_FILE_PATH):
-        logger.info("This may take a while the first time it is run. Please be patient...")
-        with open(CACHE_FILE_PATH, 'w') as f:
-            f.write("")  # Create the cache file
-
-    import cadquery as cq
-    from cadquery import exporters
-
-    # Create a simple box shape
-    box = cq.Workplane("front").box(1, 2, 3)
-
-    # Export the shape to an STL file
-    exporters.export(box, 'test_shape.stl')
-
-    logger.info("CadQuery test shape created and saved as 'test_shape.stl'")
 
 if __name__ == "__main__":
     cli()

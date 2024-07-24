@@ -1,5 +1,5 @@
 README_TEMPLATE = lambda NAME, ASSEMBLY_PATH: f"""
 # {NAME}
 
-![{ASSEMBLY_PATH}]({ASSEMBLY_PATH})
+![./assets/{ASSEMBLY_PATH}.svg](./assets/{ASSEMBLY_PATH}.svg)
 """

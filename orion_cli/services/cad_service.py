@@ -25,6 +25,7 @@ PartName = str
 AssemblyPath = str
 
 class InventoryPartVariation(BaseModel):
+    id: int
     color: Optional[list[float]] = None
     price: Optional[float] = None
 
@@ -33,7 +34,6 @@ class CatalogItem(BaseModel):
     variations: list[InventoryPartVariation]
 
 MAIN_ASSEMBLY_NAME = "MAIN_ASM"
-
 
 class InventoryVariationRef(BaseModel):
     checksum: PartChecksum
@@ -49,20 +49,24 @@ class Inventory:
     """
     parts: dict[PartChecksum, cq.Solid] = field(default_factory=dict)
     catalog: dict[PartChecksum, CatalogItem] = field(default_factory=dict)
-
+    
     def get_variation(self, ref: InventoryVariationRef):
         return self.catalog[ref.checksum].variations[ref.id]
 
-    def get_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
-        variation_id = 0
+    def get_variation_from_color(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
         if part_checksum in self.catalog:
-            for id, variation in enumerate(self.catalog[part_checksum].variations):
+            for variation in self.catalog[part_checksum].variations:
                 if variation.color == part_color:
-                    return id
-            else:
-                return len(self.catalog[part_checksum].variations)
-        return variation_id
+                    return variation
 
+    def find_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
+        variation = self.get_variation_from_color(part_checksum, part_color)
+        if variation:
+            return variation.id
+        elif part_checksum in self.catalog:
+            return len(self.catalog[part_checksum].variations)
+        else:
+            return 0
 class PartLocation(BaseModel):
     position: list[float]
     orientation: list[list[float]]
@@ -210,7 +214,16 @@ class CadService:
                     project.inventory.parts[part_ref.variation.checksum] = base_part
                 
                 part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
-                variation = InventoryPartVariation(color=part_color)
+
+                variation = InventoryPartVariation(id=part_ref.variation.id, color=part_color)
+
+                # if variation already exists in previous project state, update it
+                if index.prev_project:
+                    prev_variation = index.prev_project.inventory.get_variation_from_color(part_ref.variation.checksum, part_color)
+                    if prev_variation:
+                        variation = prev_variation
+                        variation.id = part_ref.variation.id
+            
 
                 if part_ref.variation.checksum not in project.inventory.catalog:
                     project.inventory.catalog[part_ref.variation.checksum] = CatalogItem(name=part_ref.name, variations=[variation])
@@ -274,7 +287,7 @@ class CadService:
         part_checksum = CadHelper.get_part_checksum(base_part)
         
         part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
-        variation_id = 0 if inventory is None else inventory.get_variation_id(part_checksum, part_color)
+        variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 0
 
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
@@ -337,7 +350,7 @@ class CadService:
         # assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"
 
         part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
-        variation_id = 0 if inventory is None else inventory.get_variation_id(part_checksum, part_color)
+        variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 0
 
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
@@ -362,9 +375,9 @@ class CadService:
         md = "# Inventory\n"
 
         data = []
-        for item in inventory.catalog.values():
-          svg_path = assets_path / f"{item.name}.svg"
-          data_item = {"": f"![{svg_path}](../{svg_path})", "Name": item.name}
+        for catalog_item in inventory.catalog.values():
+          svg_path = assets_path / f"{catalog_item.name}.svg"
+          data_item = {"": f"![{svg_path}](../{svg_path})", "Name": catalog_item.name}
           data.append(data_item)
 
         # Create a DataFrame
@@ -373,6 +386,7 @@ class CadService:
 
         return md + df.to_markdown(index=False)
 
+    # TODO: start breaking the function into smaller parts
     @staticmethod
     def write_project(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
@@ -499,6 +513,7 @@ class CadService:
                 project.inventory.parts[checksum] = cq.Solid(
                     CadHelper.import_brep(brep_path)
                 )
+                project.inventory.catalog[checksum] = catalog_item
 
         assembly_path = project_path / "assemblies"
 

@@ -12,7 +12,7 @@ from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
 from .base_service import BaseService
 
 class CreateService(BaseService):
-    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None, include_assets: bool = True):
+    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None, include_assets: bool = False):
         """Create a new project"""
         
         project_path = Path(path) / name

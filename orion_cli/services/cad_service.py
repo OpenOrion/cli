@@ -63,14 +63,17 @@ class Inventory:
                 return len(self.catalog[part_checksum].variations)
         return variation_id
 
+class PartLocation(BaseModel):
+    position: list[float]
+    orientation: list[list[float]]
+
 class PartRef(BaseModel):
     """
     Reference to a part in the inventory with a specific position and orientation (rotation matrix)
     """
     path: str
     variation: InventoryVariationRef
-    position: list[float]
-    orientation: list[list[float]]
+    location: PartLocation
 
     @property
     def name(self):
@@ -99,12 +102,12 @@ class Assembly(BaseModel):
             cq_assembly.add(subassembly.to_cq(project), name=subassembly.name)
         for part_ref in self.parts:
             part = project.inventory.parts[part_ref.variation.checksum]
-            loc = CadHelper.get_location(part_ref.orientation, part_ref.position)
+            loc = CadHelper.get_location(part_ref.location.orientation, part_ref.location.position)
             part_variation = project.inventory.get_variation(part_ref.variation)
 
             # TODO: find a better solution to handle negative rotation determinants (mirrors)
             if loc.wrapped.Transformation().IsNegative():
-                aligned_part = CadHelper.transform_solid(part, part_ref.orientation,part_ref.position)
+                aligned_part = CadHelper.transform_solid(part, part_ref.location.orientation, part_ref.location.position)
                 cq_assembly.add(aligned_part, color=cq.Color(*part_variation.color), name=part_ref.name)
             else:
                 cq_assembly.add(
@@ -279,8 +282,10 @@ class CadService:
                 checksum=part_checksum, 
                 id=variation_id
             ),
-            position=list(translation),
-            orientation=rotmat.tolist(),
+            location=PartLocation(
+                position=list(translation),
+                orientation=rotmat.tolist(),
+            )
         )
         return base_part, part_ref
 
@@ -340,8 +345,10 @@ class CadService:
                 checksum=part_checksum, 
                 id=variation_id
             ),
-            position=offset.tolist(),
-            orientation=rotmat.tolist(),
+            location=PartLocation(
+                position=offset.tolist(),
+                orientation=rotmat.tolist(),
+            )
         )
 
         # cache aligned part

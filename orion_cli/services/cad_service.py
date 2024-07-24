@@ -3,7 +3,6 @@ import json
 import logging
 from pathlib import Path
 from typing import Optional, OrderedDict, Sized, Union, cast
-import click
 import numpy as np
 import cadquery as cq
 from pydantic import BaseModel, Field
@@ -24,6 +23,11 @@ AlignedPartChecksum = str
 PartName = str
 AssemblyPath = str
 
+INVENTORY_DIRECTORY = "inventory"
+PARTS_DIRECTORY = "inventory/parts"
+ASSEMBLY_DIRECTORY = "assemblies"
+ASSETS_DIRECTORY = "assets"
+
 class InventoryPartVariation(BaseModel):
     id: int
     color: Optional[list[float]] = None
@@ -32,8 +36,6 @@ class InventoryPartVariation(BaseModel):
 class CatalogItem(BaseModel):
     name: str
     variations: list[InventoryPartVariation]
-
-MAIN_ASSEMBLY_NAME = "MAIN_ASM"
 
 class InventoryVariationRef(BaseModel):
     checksum: PartChecksum
@@ -157,14 +159,14 @@ class AssemblyIndex:
 
 class CadService:
     @staticmethod
-    def read_cqassembly(
+    def read_cq_assembly(
         cq_assembly: cq.Assembly,
-        project: Project,
+        project: Optional[Project] = None,
         index: Optional[AssemblyIndex] = None,
-        use_references: bool = True,
-        generate_svg: bool = True,
         curr_path: str = "",
     ):
+        if project is None:
+            project = Project()
         if index is None:
             index = AssemblyIndex()
         if curr_path == "":
@@ -178,16 +180,15 @@ class CadService:
         is_modified = False
         for cq_subassembly in cq_assembly.children:
             if isinstance(cq_subassembly, cq.Assembly) and len(cq_subassembly.children):
-                subassemblies, is_sub_modified = CadService.read_cqassembly(
+                subassemblies, is_sub_modified = CadService.read_cq_assembly(
                     cq_subassembly,
                     project,
                     index,
-                    use_references,
-                    generate_svg,
                     root_assembly.path,
                 )
                 root_assembly.add_child(subassemblies[0])
                 assemblies.extend(subassemblies)
+                
                 is_modified = is_modified or is_sub_modified
                 if is_modified:
                     index.is_assembly_modified.add(root_assembly.path)
@@ -207,39 +208,32 @@ class CadService:
                     index.is_part_modified.add(part_ref.variation)
                     index.is_assembly_modified.add(part_ref.path)
 
+                # add part reference to root assembly and project
                 root_assembly.parts.append(part_ref)
                 project.part_refs[part_ref.path] = part_ref
 
+                # add part to inventory
                 if part_ref.variation.checksum not in project.inventory.parts:
                     project.inventory.parts[part_ref.variation.checksum] = base_part
                 
-                part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
-
-                variation = InventoryPartVariation(id=part_ref.variation.id, color=part_color)
-
-                # if variation already exists in previous project state, update it
-                if index.prev_project:
-                    prev_variation = index.prev_project.inventory.get_variation_from_color(part_ref.variation.checksum, part_color)
-                    if prev_variation:
-                        variation = prev_variation
-                        variation.id = part_ref.variation.id
-            
-
-                if part_ref.variation.checksum not in project.inventory.catalog:
-                    project.inventory.catalog[part_ref.variation.checksum] = CatalogItem(name=part_ref.name, variations=[variation])
-                elif part_ref.variation.id >= len(project.inventory.catalog[part_ref.variation.checksum].variations):
-                    project.inventory.catalog[part_ref.variation.checksum].variations.append(variation)
+                # add part variation to index
+                part_checksum = part_ref.variation.checksum
+                part_variation = CadService.get_part_variation(cq_subassembly, part_ref, index)
+                if part_checksum not in project.inventory.catalog:
+                    project.inventory.catalog[part_checksum] = CatalogItem(name=part_ref.name, variations=[part_variation])
+                elif part_ref.variation.id >= len(project.inventory.catalog[part_checksum].variations):
+                    project.inventory.catalog[part_checksum].variations.append(part_variation)
 
                 CadService.assign_unique_part_names(part_ref, project, index)
 
 
         return assemblies, is_modified
 
+
     # TODO: Clean this up more
     @staticmethod
     def assign_unique_part_names(part_ref: PartRef, project: Project, index: "AssemblyIndex"):
         part_name = part_ref.name
-        assert part_name != MAIN_ASSEMBLY_NAME, f"part name {part_name} is reserved for main assembly"
         # check if part name already exists
         if part_name in index.part_names:
             prev_part_ref = index.part_names[part_name]
@@ -260,6 +254,20 @@ class CadService:
             # add part name to index with part_ref it pertains to
             index.part_names[part_name] = part_ref
             project.inventory.catalog[part_ref.variation.checksum].name = part_name
+
+    @staticmethod
+    def get_part_variation(cq_subassembly: cq.Assembly, part_ref: PartRef, index: AssemblyIndex):
+        # derive variation from color
+        part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+        variation = InventoryPartVariation(id=part_ref.variation.id, color=part_color)
+
+        # if variation already exists in previous project state, update it
+        if index.prev_project:
+            prev_variation = index.prev_project.inventory.get_variation_from_color(part_ref.variation.checksum, part_color)
+            if prev_variation:
+                variation = prev_variation.model_copy()
+                variation.id = part_ref.variation.id
+        return variation
 
 
     @staticmethod
@@ -343,12 +351,6 @@ class CadService:
             rotmat = rotmat.dot(rot_mat_adjustment)
                     
         part_checksum = CadHelper.get_part_checksum(base_part)
-
-        # recreated_original_solid = CadHelper.transform_solid(index.base_parts[part_group], rotmat).translate(offset.tolist())
-        # recreated_original_solid_checksum = CadHelper.get_part_checksum(recreated_original_solid)
-        # original_solid_checksum = CadHelper.get_part_checksum(aligned_part)
-        # assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"
-
         part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
         variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 0
 
@@ -364,6 +366,9 @@ class CadService:
             )
         )
 
+        # assert alignment is correct
+        # CadHelper.assert_correctly_aligned(base_part, aligned_part, rotmat, offset)
+
         # cache aligned part
         if aligned_checksum:
             index.aligned_refs[aligned_checksum] = part_ref
@@ -371,7 +376,7 @@ class CadService:
         return base_part, part_ref
 
     @staticmethod
-    def inventory_markdown(inventory: Inventory, assets_path: Path):
+    def get_inventory_markdown(inventory: Inventory, assets_path: Path):
         md = "# Inventory\n"
 
         data = []
@@ -386,81 +391,111 @@ class CadService:
 
         return md + df.to_markdown(index=False)
 
-    # TODO: start breaking the function into smaller parts
     @staticmethod
-    def write_project(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
+    def write_inventory(project_path: Union[Path, str],inventory: Inventory, verbose=False):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
 
-        logger.info(f"\n\nWriting project to {project_path}")
-
         project_path = Path(project_path)
-        project_path.mkdir(parents=True, exist_ok=True)
-        assembly_path = project_path / "assemblies"
-        assets_path = project_path / "assets"
-        inventory_path = project_path / "inventory"
-        parts_path = inventory_path / "parts"
+        inventory_path = project_path / INVENTORY_DIRECTORY
+        parts_path = project_path / PARTS_DIRECTORY
 
+        logger.info(f"Writing inventory to {inventory_path}")
 
-        # delete directory path
-        if project_path.is_dir():
-            if assembly_path.is_dir():
-                shutil.rmtree(assembly_path)
-            if inventory_path.is_dir():
-                shutil.rmtree(inventory_path)
+        if project_path.is_dir() and inventory_path.is_dir():
+            shutil.rmtree(inventory_path)
         inventory_path.mkdir(parents=True, exist_ok=True)
         parts_path.mkdir(parents=True, exist_ok=True)
-        assembly_path.mkdir(parents=True, exist_ok=True)
-        assets_path.mkdir(parents=True, exist_ok=True)
 
         # Generate BREP files for each part
-        part_names = set()
-        logger.info(f"\n\nWriting inventory to {inventory_path}")
-        for checksum, part in project.inventory.parts.items():
-            part_name = project.inventory.catalog[checksum].name
-            part_names.add(part_name)
-
+        for checksum, part in inventory.parts.items():
+            part_name = inventory.catalog[checksum].name
             brep_path = parts_path / f"{part_name}.brep"
             with open(brep_path, "w") as f:
                 CadHelper.export_brep(part.wrapped, f"{brep_path}")
                 logger.info(f"- Exported part '{part_name}'")
 
-            # Generate SVGs for each part if they are modified or don't exist
-            if project.options.include_assets:
-                svg_path = assets_path / f"{part_name}.svg"
-                if not index or index and checksum in index.is_part_modified or not svg_path.exists():
-                    logger.info(f"- Generating SVG for part '{part_name}'")
-                    svg = getSVG(part, {"showAxes": False, "marginLeft": 20})
-                    with open(svg_path, "w") as f:
-                        f.write(svg)
-
-        with open(inventory_path / "README.md", "w") as f:
-            f.write(CadService.inventory_markdown(project.inventory, assets_path.relative_to(project_path)))
-
         with open(inventory_path / "catalog.json", "w") as f:
-            serialized_items = {key: model.model_dump() for key, model in project.inventory.catalog.items()}
+            serialized_items = {key: model.model_dump() for key, model in inventory.catalog.items()}
             json.dump(serialized_items, f, indent=4)
 
+    @staticmethod
+    def write_assets(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
+
+        project_path = Path(project_path)
+        assets_path = project_path / ASSETS_DIRECTORY
+        inventory_path = project_path / INVENTORY_DIRECTORY
+        assets_path.mkdir(parents=True, exist_ok=True)
+
+        logger.info(f"Writing assets to {project_path}")
+
+        # Generate SVGs for each part if they are modified or don't exist
+        part_names = set()
+        for checksum, catalog_item in project.inventory.catalog.items():
+            part = project.inventory.parts[checksum]
+            part_names.add(catalog_item.name)
+            svg_path = assets_path / f"{catalog_item.name}.svg"
+            if not index or index and checksum in index.is_part_modified or not svg_path.exists():
+                logger.info(f"- Generating SVG for part '{catalog_item.name}'")
+                svg = getSVG(part, {"showAxes": False, "marginLeft": 20})
+                with open(svg_path, "w") as f:
+                    f.write(svg)
+
+
+        # Generate assets for main assembly
+        with open(inventory_path / "README.md", "w") as f:
+            inventory_md = CadService.get_inventory_markdown(project.inventory, assets_path)
+            f.write(inventory_md)
+
+        logger.info("- Removing SVG files not in inventory")
+        for svg_path in assets_path.glob("*.svg"):
+            if svg_path.stem not in part_names:
+                svg_path.unlink()
+
+
+    @staticmethod
+    def write_assemblies(project_path: Union[Path, str], project: Project, verbose=False):
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
+
+        project_path = Path(project_path)
+        assembly_path = project_path / ASSEMBLY_DIRECTORY
+
+        logger.info(f"Writing assemblies to {assembly_path}")
+
+        # delete directory path
+        if project_path.is_dir() and assembly_path.is_dir():
+                shutil.rmtree(assembly_path)
+        assembly_path.mkdir(parents=True, exist_ok=True)
+
         # Generate assembly files
-        logger.info(f"\n\nWriting assemblies to {assembly_path}")
         for assembly in project.assemblies.values():
             subassembly_path = assembly_path / assembly.path.lstrip("/")
             subassembly_path.mkdir(parents=True, exist_ok=True)
             with open(subassembly_path / "assembly.json", "w") as f:
                 f.write(assembly.model_dump_json(indent=4))
     
-        if project.options.include_assets:
-            logger.info("- Removing SVG files not in inventory")
-            for svg_path in assets_path.glob("*.svg"):
-                if svg_path.stem not in part_names and svg_path.stem != MAIN_ASSEMBLY_NAME:
-                    svg_path.unlink()
 
-            # logger.info("- Generating SVG for main assembly, this might take a sec ...")
-            # if index is None or project.root_assembly.path in index.is_assembly_modified:
-            #     cq_assembly = project.root_assembly.to_cq(project)
-            #     cq_comp = cq_assembly.toCompound()
-            #     svg = getSVG(cq_comp, {"showAxes": False, "marginLeft": 20})
-            #     with open(assets_path / f"{MAIN_ASSEMBLY_NAME}.svg", "w") as f:
-            #         f.write(svg)
+    # TODO: start breaking the function into smaller parts
+    @staticmethod
+    def write_project(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
+        
+        logger.info(f"\n\nWriting project to {project_path}")
+        project_path = Path(project_path)
+        project_path.mkdir(parents=True, exist_ok=True)
+
+        # Write inventory
+        logger.info(f"\n\n")
+        CadService.write_inventory(project_path, project.inventory, verbose)
+
+        # Write assemblies
+        logger.info(f"\n\n")
+        CadService.write_assemblies(project_path, project, verbose)
+
+        # Write assets
+        if project.options.include_assets:
+            logger.info(f"\n\n")
+            CadService.write_assets(project_path, project, index, verbose)
 
 
     @staticmethod
@@ -477,7 +512,7 @@ class CadService:
             # Create the new directory
             logger.info(f"\n\nLoading in step file {cad_file}")
             cq_assembly = CadHelper.import_cad(cad_file)
-            CadService.read_cqassembly(cq_assembly, project)
+            CadService.convert_cq_assembly(cq_assembly, project)
         CadService.write_project(project_path, project, verbose=verbose)
 
     @staticmethod
@@ -492,7 +527,7 @@ class CadService:
         if project_options:
             revised_project.options = project_options
         index = AssemblyIndex(prev_project=prev_project)
-        CadService.read_cqassembly(cq_assembly, revised_project, index)
+        CadService.convert_cq_assembly(cq_assembly, revised_project, index)
 
         if write:
             CadService.write_project(project_path, revised_project, verbose=verbose)
@@ -505,7 +540,7 @@ class CadService:
 
         project_path = Path(project_path)
         assert project_path.is_dir(), f"Project directory not found: {project_path}"
-        inventory_path = project_path / "inventory"
+        inventory_path = project_path / INVENTORY_DIRECTORY
         parts_path = inventory_path / "parts"
 
         with open(inventory_path / "catalog.json", "r") as f:
@@ -518,7 +553,7 @@ class CadService:
                 )
                 project.inventory.catalog[checksum] = catalog_item
 
-        assembly_path = project_path / "assemblies"
+        assembly_path = project_path / ASSEMBLY_DIRECTORY
 
         for assembly_file_path in assembly_path.rglob("assembly.json"):
             if assembly_file_path.is_file():

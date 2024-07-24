@@ -294,3 +294,10 @@ class CadHelper:
         if cache_path:
             CadHelper.save_cache(cache, cache_path)
         return viewer
+    
+    @staticmethod
+    def assert_correctly_aligned(base_part: cq.Solid, aligned_part: cq.Solid, rotmat: RotationMatrixLike, offset: VectorLike):
+        recreated_original_solid = CadHelper.transform_solid(base_part, rotmat).translate(offset.tolist())
+        recreated_original_solid_checksum = CadHelper.get_part_checksum(recreated_original_solid)
+        original_solid_checksum = CadHelper.get_part_checksum(aligned_part)
+        assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"

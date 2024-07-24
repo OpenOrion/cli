@@ -5,7 +5,7 @@ import click
 import yaml
 import shutil
 
-from orion_cli.services.cad_service import CadService, ProjectOptions, MAIN_ASSEMBLY_NAME
+from orion_cli.services.cad_service import CadService, ProjectOptions
 from orion_cli.helpers.config_helper import ProjectConfig
 from orion_cli.templates.README_template import README_TEMPLATE
 from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
@@ -55,7 +55,7 @@ class CreateService(BaseService):
 
             # Read the content of the template .gitignore file
             gitignore_content = GITIGNORE_TEMPLATE
-            readme_content = README_TEMPLATE(name, MAIN_ASSEMBLY_NAME)
+            readme_content = README_TEMPLATE(name, remote_url)
             # Write the content to the new project's .gitignore file
             (project_path / ".gitignore").write_text(gitignore_content)
             (project_path / "README.md").write_text(readme_content)

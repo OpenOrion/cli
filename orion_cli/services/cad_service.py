@@ -67,7 +67,7 @@ class Inventory:
             return len(self.catalog[part_checksum].variations)
         else:
             return 0
-class PartLocation(BaseModel):
+class Location(BaseModel):
     position: list[float]
     orientation: list[list[float]]
 
@@ -77,7 +77,7 @@ class PartRef(BaseModel):
     """
     path: str
     variation: InventoryVariationRef
-    location: PartLocation
+    location: Location
 
     @property
     def name(self):
@@ -295,7 +295,7 @@ class CadService:
                 checksum=part_checksum, 
                 id=variation_id
             ),
-            location=PartLocation(
+            location=Location(
                 position=list(translation),
                 orientation=rotmat.tolist(),
             )
@@ -358,7 +358,7 @@ class CadService:
                 checksum=part_checksum, 
                 id=variation_id
             ),
-            location=PartLocation(
+            location=Location(
                 position=offset.tolist(),
                 orientation=rotmat.tolist(),
             )
@@ -398,6 +398,7 @@ class CadService:
         assembly_path = project_path / "assemblies"
         assets_path = project_path / "assets"
         inventory_path = project_path / "inventory"
+        parts_path = inventory_path / "parts"
 
 
         # delete directory path
@@ -407,6 +408,7 @@ class CadService:
             if inventory_path.is_dir():
                 shutil.rmtree(inventory_path)
         inventory_path.mkdir(parents=True, exist_ok=True)
+        parts_path.mkdir(parents=True, exist_ok=True)
         assembly_path.mkdir(parents=True, exist_ok=True)
         assets_path.mkdir(parents=True, exist_ok=True)
 
@@ -417,7 +419,7 @@ class CadService:
             part_name = project.inventory.catalog[checksum].name
             part_names.add(part_name)
 
-            brep_path = inventory_path / f"{part_name}.brep"
+            brep_path = parts_path / f"{part_name}.brep"
             with open(brep_path, "w") as f:
                 CadHelper.export_brep(part.wrapped, f"{brep_path}")
                 logger.info(f"- Exported part '{part_name}'")
@@ -431,27 +433,11 @@ class CadService:
                     with open(svg_path, "w") as f:
                         f.write(svg)
 
-        if project.options.include_assets:
-            logger.info("- Generating SVG for main assembly, this might take a sec ...")
-            if index is None or project.root_assembly.path in index.is_assembly_modified:
-                cq_assembly = project.root_assembly.to_cq(project)
-                cq_comp = cq_assembly.toCompound()
-                svg = getSVG(cq_comp, {"showAxes": False, "marginLeft": 20})
-                with open(assets_path / f"{MAIN_ASSEMBLY_NAME}.svg", "w") as f:
-                    f.write(svg)
-
-            logger.info("- Removing SVG files not in inventory")
-            for svg_path in assets_path.glob("*.svg"):
-                if svg_path.stem not in part_names and svg_path.stem != MAIN_ASSEMBLY_NAME:
-                    svg_path.unlink()
-
-
         with open(inventory_path / "README.md", "w") as f:
             f.write(CadService.inventory_markdown(project.inventory, assets_path.relative_to(project_path)))
 
         with open(inventory_path / "catalog.json", "w") as f:
             serialized_items = {key: model.model_dump() for key, model in project.inventory.catalog.items()}
-
             json.dump(serialized_items, f, indent=4)
 
         # Generate assembly files
@@ -462,6 +448,21 @@ class CadService:
             with open(subassembly_path / "assembly.json", "w") as f:
                 f.write(assembly.model_dump_json(indent=4))
     
+        if project.options.include_assets:
+            logger.info("- Removing SVG files not in inventory")
+            for svg_path in assets_path.glob("*.svg"):
+                if svg_path.stem not in part_names and svg_path.stem != MAIN_ASSEMBLY_NAME:
+                    svg_path.unlink()
+
+            # logger.info("- Generating SVG for main assembly, this might take a sec ...")
+            # if index is None or project.root_assembly.path in index.is_assembly_modified:
+            #     cq_assembly = project.root_assembly.to_cq(project)
+            #     cq_comp = cq_assembly.toCompound()
+            #     svg = getSVG(cq_comp, {"showAxes": False, "marginLeft": 20})
+            #     with open(assets_path / f"{MAIN_ASSEMBLY_NAME}.svg", "w") as f:
+            #         f.write(svg)
+
+
     @staticmethod
     def create_project(
         project_path: Path,
@@ -505,11 +506,13 @@ class CadService:
         project_path = Path(project_path)
         assert project_path.is_dir(), f"Project directory not found: {project_path}"
         inventory_path = project_path / "inventory"
+        parts_path = inventory_path / "parts"
+
         with open(inventory_path / "catalog.json", "r") as f:
             catalog = dict(json.load(f))
             for checksum, catalog_item in catalog.items():
                 catalog_item = CatalogItem.model_validate(catalog_item)
-                brep_path = inventory_path / f"{catalog_item.name}.brep"
+                brep_path = parts_path / f"{catalog_item.name}.brep"
                 project.inventory.parts[checksum] = cq.Solid(
                     CadHelper.import_brep(brep_path)
                 )

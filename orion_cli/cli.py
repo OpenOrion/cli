@@ -17,7 +17,7 @@ def cli():
 @click.option("--name", help="The name of the project", required=False)
 @click.option("--cad_path", help="The path for a step file (CAD/3D) to be processed with the tool", type=click.Path(), required=False)
 @click.option("--remote_url", help="The URL of the remote repository", required=False, default=None)
-@click.option("--include_assets", help="Include assets in the project", is_flag=False)
+@click.option("--include_assets", help="Include assets in the project", is_flag=True, default=False)
 def create_command(name: str, cad_path: str, remote_url: Optional[str], include_assets: bool):
     """Create a new project"""
     from pathlib import Path

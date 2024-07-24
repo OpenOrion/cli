@@ -24,11 +24,23 @@ AlignedPartChecksum = str
 PartName = str
 AssemblyPath = str
 
-class InventoryItem(BaseModel):
-    name: str
+class InventoryPartVariation(BaseModel):
+    color: Optional[list[float]] = None
     price: Optional[float] = None
 
+class CatalogItem(BaseModel):
+    name: str
+    variations: list[InventoryPartVariation]
+
 MAIN_ASSEMBLY_NAME = "MAIN_ASM"
+
+
+class InventoryVariationRef(BaseModel):
+    checksum: PartChecksum
+    id: int
+
+    def __hash__(self):
+        return hash((self.checksum, self.id))
 
 @dataclass
 class Inventory:
@@ -36,18 +48,29 @@ class Inventory:
     Catalog of all parts in the project
     """
     parts: dict[PartChecksum, cq.Solid] = field(default_factory=dict)
-    items: dict[PartChecksum, InventoryItem] = field(default_factory=dict)
+    catalog: dict[PartChecksum, CatalogItem] = field(default_factory=dict)
 
+    def get_variation(self, ref: InventoryVariationRef):
+        return self.catalog[ref.checksum].variations[ref.id]
+
+    def get_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
+        variation_id = 0
+        if part_checksum in self.catalog:
+            for id, variation in enumerate(self.catalog[part_checksum].variations):
+                if variation.color == part_color:
+                    return id
+            else:
+                return len(self.catalog[part_checksum].variations)
+        return variation_id
 
 class PartRef(BaseModel):
     """
     Reference to a part in the inventory with a specific position and orientation (rotation matrix)
     """
     path: str
-    checksum: str
+    variation: InventoryVariationRef
     position: list[float]
     orientation: list[list[float]]
-    color: Optional[list] = None
 
     @property
     def name(self):
@@ -75,16 +98,17 @@ class Assembly(BaseModel):
             subassembly = project.assemblies[subassembly_path]
             cq_assembly.add(subassembly.to_cq(project), name=subassembly.name)
         for part_ref in self.parts:
-            part = project.inventory.parts[part_ref.checksum]
+            part = project.inventory.parts[part_ref.variation.checksum]
             loc = CadHelper.get_location(part_ref.orientation, part_ref.position)
-            
+            part_variation = project.inventory.get_variation(part_ref.variation)
+
             # TODO: find a better solution to handle negative rotation determinants (mirrors)
             if loc.wrapped.Transformation().IsNegative():
                 aligned_part = CadHelper.transform_solid(part, part_ref.orientation,part_ref.position)
-                cq_assembly.add(aligned_part, color=cq.Color(*part_ref.color), name=part_ref.name)
+                cq_assembly.add(aligned_part, color=cq.Color(*part_variation.color), name=part_ref.name)
             else:
                 cq_assembly.add(
-                    part, color=cq.Color(*part_ref.color), name=part_ref.name, loc=loc
+                    part, color=cq.Color(*part_variation.color), name=part_ref.name, loc=loc
                 )
 
         return cq_assembly
@@ -116,10 +140,11 @@ class AssemblyIndex:
     base_parts: dict[PartGroup, cq.Solid] = field(default_factory=dict)
     aligned_refs: dict[AlignedPartChecksum, PartRef] = field(default_factory=dict)
     part_names: dict[PartName, Optional[PartRef]] = field(default_factory=dict)
+    part_colors: dict[PartChecksum, set[tuple[float]]] = field(default_factory=dict)
 
     # revisioning    
     prev_project: Optional["Project"] = None
-    is_part_modified: set[PartChecksum] = field(default_factory=set)
+    is_part_modified: set[InventoryVariationRef] = field(default_factory=set)
     is_assembly_modified: set[AssemblyPath] = field(default_factory=set)
 
 
@@ -161,62 +186,71 @@ class CadService:
                     index.is_assembly_modified.add(root_assembly.path)
             else:
                 base_part, part_ref = CadService.get_part(
-                    cq_subassembly, root_assembly.path, index, project.options
+                    cq_subassembly, root_assembly.path, project.inventory, index, project.options
                 )
 
                 is_modified = not(
                     # has the path been previously indexed
                     index.prev_project and part_ref.path in index.prev_project.part_refs and 
                     # if the part checksum is the same
-                    index.prev_project.part_refs[part_ref.path].checksum == part_ref.checksum
+                    index.prev_project.part_refs[part_ref.path].variation == part_ref.variation
                 )
                 
                 if is_modified:
-                    index.is_part_modified.add(part_ref.checksum)
+                    index.is_part_modified.add(part_ref.variation)
                     index.is_assembly_modified.add(part_ref.path)
 
                 root_assembly.parts.append(part_ref)
                 project.part_refs[part_ref.path] = part_ref
 
-                if part_ref.checksum not in project.inventory.parts:
-                    project.inventory.parts[part_ref.checksum] = base_part
-                if part_ref.checksum not in project.inventory.items:
-                    project.inventory.items[part_ref.checksum] = InventoryItem(name=part_ref.name)
+                if part_ref.variation.checksum not in project.inventory.parts:
+                    project.inventory.parts[part_ref.variation.checksum] = base_part
                 
+                part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+                variation = InventoryPartVariation(color=part_color)
+
+                if part_ref.variation.checksum not in project.inventory.catalog:
+                    project.inventory.catalog[part_ref.variation.checksum] = CatalogItem(name=part_ref.name, variations=[variation])
+                elif part_ref.variation.id >= len(project.inventory.catalog[part_ref.variation.checksum].variations):
+                    project.inventory.catalog[part_ref.variation.checksum].variations.append(variation)
+
                 CadService.assign_unique_part_names(part_ref, project, index)
 
 
         return assemblies, is_modified
 
+    # TODO: Clean this up more
     @staticmethod
-    def assign_unique_part_names(part_ref: PartRef, project: Project, index: AssemblyIndex):
+    def assign_unique_part_names(part_ref: PartRef, project: Project, index: "AssemblyIndex"):
         part_name = part_ref.name
         assert part_name != MAIN_ASSEMBLY_NAME, f"part name {part_name} is reserved for main assembly"
         # check if part name already exists
         if part_name in index.part_names:
             prev_part_ref = index.part_names[part_name]
-            if prev_part_ref and part_ref.checksum != prev_part_ref.checksum:
+            if prev_part_ref and part_ref.variation != prev_part_ref.variation:
                 # going back and modifying the previous part name
                 prev_path_strs = prev_part_ref.path.split("/")
                 prev_part_name = '-'.join(prev_path_strs[min(project.options.max_name_depth, len(prev_path_strs)):])
                 assert prev_part_name not in index.part_names, f"part name {prev_part_name} already exists"
-                project.inventory.items[prev_part_ref.checksum].name = prev_part_name
+                project.inventory.catalog[prev_part_ref.variation.checksum].name = prev_part_name
 
                 # modifying the current part name
                 path_strs = part_ref.path.split("/")
                 part_name = '-'.join(path_strs[min(project.options.max_name_depth, len(path_strs)):])
                 assert part_name not in index.part_names, f"part name {part_name} already exists"
-                project.inventory.items[part_ref.checksum].name = part_name
+                project.inventory.catalog[part_ref.variation.checksum].name = part_name
 
         else:
             # add part name to index with part_ref it pertains to
             index.part_names[part_name] = part_ref
-            project.inventory.items[part_ref.checksum].name = name=part_name
+            project.inventory.catalog[part_ref.variation.checksum].name = part_name
+
 
     @staticmethod
     def get_part(
         cq_subassembly: cq.Assembly,
         assembly_path: str,
+        inventory: Optional[Inventory] = None,
         index: Optional[AssemblyIndex] = None,
         options: Optional[ProjectOptions] = None,
     ):
@@ -224,31 +258,39 @@ class CadService:
             "is_reference", False
         )
         if is_reference:
-            return CadService.get_referenced_part(cq_subassembly, assembly_path)
+            return CadService.get_referenced_part(cq_subassembly, assembly_path, inventory)
         else:
             normalize_axis=options is not None and options.normalize_axis
-            return CadService.get_non_reference_part(cq_subassembly, assembly_path, index, normalize_axis)
+            return CadService.get_non_reference_part(cq_subassembly, assembly_path, inventory, index, normalize_axis)
 
     @staticmethod
-    def get_referenced_part(cq_subassembly: cq.Assembly, assembly_path: str):
+    def get_referenced_part(cq_subassembly: cq.Assembly, assembly_path: str, inventory: Optional[Inventory] = None):
         base_part = cast(cq.Solid, cast(cq.Workplane, cq_subassembly.obj).val())
         translation, euler_angles = cq_subassembly.loc.toTuple()
         rotmat = R.from_euler("xyz", euler_angles, degrees=True).as_matrix()
         part_checksum = CadHelper.get_part_checksum(base_part)
-
+        
+        part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+        variation_id = 0 if inventory is None else inventory.get_variation_id(part_checksum, part_color)
 
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
-            checksum=part_checksum,
+            variation=InventoryVariationRef(
+                checksum=part_checksum, 
+                id=variation_id
+            ),
             position=list(translation),
             orientation=rotmat.tolist(),
-            color=list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None,
         )
         return base_part, part_ref
 
     @staticmethod
     def get_non_reference_part(
-        cq_subassembly: cq.Assembly, assembly_path: str, index: Optional[AssemblyIndex] = None, normalize_axis: bool = False
+        cq_subassembly: cq.Assembly, 
+        assembly_path: str, 
+        inventory: Optional[Inventory] = None, 
+        index: Optional[AssemblyIndex] = None, 
+        normalize_axis: bool = False
     ):
         if index is None:
             index = AssemblyIndex()
@@ -259,7 +301,7 @@ class CadService:
             aligned_checksum = CadHelper.get_part_checksum(aligned_part)
             if index.prev_project and aligned_checksum in index.aligned_refs:
                 part_ref = index.aligned_refs[aligned_checksum]
-                base_part = index.prev_project.inventory.parts[part_ref.checksum]
+                base_part = index.prev_project.inventory.parts[part_ref.variation.checksum]
                 return base_part, part_ref
         else:
             # if not normalizing axis, then no need to check for aligned part, everything is already fast enough
@@ -289,12 +331,17 @@ class CadService:
         # original_solid_checksum = CadHelper.get_part_checksum(aligned_part)
         # assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"
 
+        part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+        variation_id = 0 if inventory is None else inventory.get_variation_id(part_checksum, part_color)
+
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
-            checksum=part_checksum,
+            variation=InventoryVariationRef(
+                checksum=part_checksum, 
+                id=variation_id
+            ),
             position=offset.tolist(),
             orientation=rotmat.tolist(),
-            color=list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None,
         )
 
         # cache aligned part
@@ -308,7 +355,7 @@ class CadService:
         md = "# Inventory\n"
 
         data = []
-        for item in inventory.items.values():
+        for item in inventory.catalog.values():
           svg_path = assets_path / f"{item.name}.svg"
           data_item = {"": f"![{svg_path}](../{svg_path})", "Name": item.name}
           data.append(data_item)
@@ -346,7 +393,7 @@ class CadService:
         part_names = set()
         logger.info(f"\n\nWriting inventory to {inventory_path}")
         for checksum, part in project.inventory.parts.items():
-            part_name = project.inventory.items[checksum].name
+            part_name = project.inventory.catalog[checksum].name
             part_names.add(part_name)
 
             brep_path = inventory_path / f"{part_name}.brep"
@@ -381,8 +428,8 @@ class CadService:
         with open(inventory_path / "README.md", "w") as f:
             f.write(CadService.inventory_markdown(project.inventory, assets_path.relative_to(project_path)))
 
-        with open(inventory_path / "parts.json", "w") as f:
-            serialized_items = {key: model.model_dump() for key, model in project.inventory.items.items()}
+        with open(inventory_path / "catalog.json", "w") as f:
+            serialized_items = {key: model.model_dump() for key, model in project.inventory.catalog.items()}
 
             json.dump(serialized_items, f, indent=4)
 
@@ -437,11 +484,11 @@ class CadService:
         project_path = Path(project_path)
         assert project_path.is_dir(), f"Project directory not found: {project_path}"
         inventory_path = project_path / "inventory"
-        with open(inventory_path / "parts.json", "r") as f:
-            inventory_items = dict(json.load(f))
-            for checksum, item in inventory_items.items():
-                inventory_item = InventoryItem.model_validate(item)
-                brep_path = inventory_path / f"{inventory_item.name}.brep"
+        with open(inventory_path / "catalog.json", "r") as f:
+            catalog = dict(json.load(f))
+            for checksum, catalog_item in catalog.items():
+                catalog_item = CatalogItem.model_validate(catalog_item)
+                brep_path = inventory_path / f"{catalog_item.name}.brep"
                 project.inventory.parts[checksum] = cq.Solid(
                     CadHelper.import_brep(brep_path)
                 )

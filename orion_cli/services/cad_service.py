@@ -512,7 +512,7 @@ class CadService:
             # Create the new directory
             logger.info(f"\n\nLoading in step file {cad_file}")
             cq_assembly = CadHelper.import_cad(cad_file)
-            CadService.convert_cq_assembly(cq_assembly, project)
+            CadService.read_cq_assembly(cq_assembly, project)
         CadService.write_project(project_path, project, verbose=verbose)
 
     @staticmethod
@@ -527,7 +527,7 @@ class CadService:
         if project_options:
             revised_project.options = project_options
         index = AssemblyIndex(prev_project=prev_project)
-        CadService.convert_cq_assembly(cq_assembly, revised_project, index)
+        CadService.read_cq_assembly(cq_assembly, revised_project, index)
 
         if write:
             CadService.write_project(project_path, revised_project, verbose=verbose)

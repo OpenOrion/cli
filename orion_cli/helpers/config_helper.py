@@ -23,6 +23,11 @@ class ConfigHelper:
         with open(config_path, 'r') as file:
             config_data = yaml.safe_load(file)
         return ProjectConfig(**config_data)
+    
+    @staticmethod
+    def save_config(config_path: Path, config: ProjectConfig):
+        with open(config_path, 'w') as file:
+            yaml.dump(config.dict(), file)
 
 # class GlobalConfig(BaseModel):
 #     default_project_options: ProjectOptions = Field(default_factory=ProjectOptions)

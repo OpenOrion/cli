@@ -1,21 +1,26 @@
 import subprocess
 from typing import Optional
 import click
+from orion_cli.helpers.remote_helper import RemoteHelper
 
 class DeployService:
     @staticmethod
     def deploy(deploy_msg: str = ""):
         """Commit staged changes and deploy the project to the remote repository"""
+        assert RemoteHelper.ensure_git_installed(), "Git is not installed. Please install Git and try again."
+        assert RemoteHelper.ensure_git_configured(), (
+            "Git user information is not configured. "
+            "Please set your Git user name and email using the following commands:\n"
+            'git config --global user.name "Your Name"\n'
+            'git config --global user.email "you@example.com"'
+        )
         try:
             # Commit changes
             subprocess.check_call(["git", "commit", "-m", deploy_msg])
             click.echo("Changes committed successfully.")
 
-            # Get current branch name
-            current_branch = subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"],
-                universal_newlines=True
-            ).strip()
+            # Set branch name to 'main'
+            current_branch = "main"
 
             # Attempt to push changes
             try:

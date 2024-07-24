@@ -65,6 +65,19 @@ class RevisionService(BaseService):
 
     def revision(self, project_path: Union[str,Path], cad_path: Union[str,Path], project_options: Optional[ProjectOptions] = None):
         """Update the project structure and commit the changes"""
+        from orion_cli.helpers.config_helper import ConfigHelper
+        from orion_cli.helpers.remote_helper import RemoteHelper
+        import os
+        import shutil
+
+        assert RemoteHelper.ensure_git_installed(), "Git is not installed. Please install Git and try again."
+        assert RemoteHelper.ensure_git_configured(), (
+            "Git user information is not configured. "
+            "Please set your Git user name and email using the following commands:\n"
+            'git config --global user.name "Your Name"\n'
+            'git config --global user.email "you@example.com"'
+        )
+
         project_path = Path(project_path)
         cad_path = Path(cad_path)
 
@@ -74,6 +87,23 @@ class RevisionService(BaseService):
             click.echo(f"Revising project at {project_path} with CAD file {cad_path}")
             # Regenerate the project structure
             CadService.revise_project(project_path, cad_path, write=True, project_options=project_options, verbose=True)
+            click.echo("Made it passed the revise project")
+            # Load config
+            config = ConfigHelper.load_config(project_path / "config.yaml")
+            
+            if str(cad_path) != config.cad_path:
+                cad_file_path = project_path / config.cad_path
+                if cad_file_path.exists():
+                    cad_file_path.unlink()
+                    click.echo(f"Deleted CAD file at {cad_file_path}")
+                # Copy CAD file to project path
+                shutil.copy(cad_path, project_path / Path(cad_path).name)
+                click.echo(f"Copied CAD file to {project_path / Path(cad_path).name}")
+                config.cad_path = Path(cad_path).name
+                
+                ConfigHelper.save_config(project_path / "config.yaml", config)
+
+                click.echo(f"Updated CAD file path in config.yaml to {cad_path.name}")
 
             # Show changes before staging
             self.show_changes(project_path)
@@ -86,4 +116,7 @@ class RevisionService(BaseService):
             else:
                 click.echo("Changes not staged.")
         except Exception as e:
-            click.echo(f"Error: {e}")
+            error_message = f"Error occurred while executing the revision: {e}"
+            click.echo(error_message)
+            logging.exception(error_message)
+            

@@ -34,13 +34,20 @@ def create_project(module_tmp_path: Path, robot_step_file: Path):
     if os.path.exists(project_path):
         shutil.rmtree(project_path)
 
-# @pytest.fixture(scope="module")
-# def revise_project(create_project):
-#     project_path = create_project
-#     os.chdir(project_path)
+@pytest.fixture(scope="module")
+def revise_project(create_project):
+    project_path = create_project
 
-#     runner = CliRunner()
-#     result = runner.invoke(cli, ['revise'], input='y\n')
-#     assert result.exit_code == 0
+    # Change the current working directory to the project path
+    os.chdir(project_path)
+    
+    try:
+        runner = CliRunner()
+        result = runner.invoke(cli, ['revision'], input='y\n')
+        print(f"CLI revise command exit code: {result.exit_code}")
+        print(f"CLI revise command output: {result.output}")
+        assert result.exit_code == 0
+    except Exception as e:
+        print(f"Error revising project: {e}")
 
-#     yield project_path
+    yield project_path

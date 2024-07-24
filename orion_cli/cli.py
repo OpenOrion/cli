@@ -77,7 +77,7 @@ def create_command(name: str, cad_path: str, remote_url: Optional[str], include_
     logger.info("Project creation/update completed successfully.")
 
 @cli.command(name="revision")
-@click.option("--project-path", type=click.Path(exists=True),help="The path of the project to be revised", required=False)
+@click.option("--project_path", type=click.Path(exists=True),help="The path of the project to be revised", required=False)
 @click.option("--cad_path", type=click.Path(exists=True), help="The path for a step file (CAD/3D) to be processed with the tool", required=False)
 def revision_command(project_path: Union[str, Path], cad_path: str):
     """Update the project structure and commit the changes"""
@@ -101,6 +101,7 @@ def revision_command(project_path: Union[str, Path], cad_path: str):
             click.echo("Invalid CAD path provided in config.")
             return
         cad_path = config.cad_path
+        
 
     service = RevisionService()
     service.revision(project_path, cad_path, config.options)

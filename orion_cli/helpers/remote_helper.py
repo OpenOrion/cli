@@ -3,6 +3,10 @@ import click
 from typing import Optional
 
 
+import subprocess
+import click
+from typing import Optional
+
 class RemoteHelper:
     @staticmethod
     def validate_remote_url(remote_url: str) -> bool:
@@ -11,9 +15,32 @@ class RemoteHelper:
             return True
         except subprocess.CalledProcessError:
             return False
+
+    @staticmethod
+    def ensure_git_installed() -> bool:
+        try:
+            subprocess.check_output(["git", "--version"], stderr=subprocess.DEVNULL)
+            return True
+        except subprocess.CalledProcessError:
+            return False
+        except FileNotFoundError:
+            return False
         
+    @staticmethod
+    def ensure_git_configured() -> bool:
+        try:
+            user_name = subprocess.check_output(["git", "config", "--global", "user.name"], stderr=subprocess.DEVNULL).strip()
+            user_email = subprocess.check_output(["git", "config", "--global", "user.email"], stderr=subprocess.DEVNULL).strip()
+            return bool(user_name) and bool(user_email)
+        except subprocess.CalledProcessError:
+            return False
+
     @classmethod
     def get_valid_remote_url(cls, initial_url: Optional[str] = None) -> Optional[str]:
+        if not cls.ensure_git_installed():
+            click.echo("Git is not installed on your machine. Please install Git to continue.")
+            raise click.Abort()
+
         remote_url = initial_url
         while True:
             if remote_url is not None:

@@ -6,7 +6,8 @@ import yaml
 import shutil
 
 from orion_cli.services.cad_service import CadService, ProjectOptions
-from orion_cli.helpers.config_helper import ProjectConfig
+from orion_cli.helpers.config_helper import ProjectConfig, ConfigHelper
+from orion_cli.helpers.remote_helper import RemoteHelper
 from orion_cli.templates.README_template import README_TEMPLATE
 from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
 from .base_service import BaseService
@@ -14,6 +15,13 @@ from .base_service import BaseService
 class CreateService(BaseService):
     def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None, include_assets: bool = False):
         """Create a new project"""
+        assert RemoteHelper.ensure_git_installed(), "Git is not installed. Please install Git and try again."
+        assert RemoteHelper.ensure_git_configured(), (
+            "Git user information is not configured. "
+            "Please set your Git user name and email using the following commands:\n"
+            'git config --global user.name "Your Name"\n'
+            'git config --global user.email "you@example.com"'
+        )
         
         project_path = Path(path) / name
         cad_path = Path(cad_path).resolve()
@@ -43,8 +51,7 @@ class CreateService(BaseService):
             )
 
             config_path = project_path / "config.yaml"
-            with open(config_path, "w") as f:
-                yaml.dump(project_config.model_dump(), f)
+            ConfigHelper.save_config(config_path, project_config)
 
             click.echo(f"Project '{name}' has been created at {project_path}")
             click.echo(f"Configuration file created at {config_path}")

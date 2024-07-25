@@ -25,54 +25,59 @@ class CreateService(BaseService):
         
         project_path = Path(path) / name
         cad_path = Path(cad_path).resolve()
+        project_options = ProjectOptions(include_assets=include_assets)
+        
+        click.echo(f"Creating project '{name}' at {project_path}")
+        project_path.mkdir(parents=True, exist_ok=True)
 
-        try:
-            click.echo(f"Creating project '{name}' at {project_path}")
+        # Copy CAD file to project directory
+        cad_file_name = cad_path.name
+        project_step_file = project_path / cad_file_name
+        shutil.copy2(cad_path, project_step_file)
 
-            # Create the project using CadService
-            CadService.create_project(
-                project_path=project_path,
-                cad_file=cad_path,
-                project_options=ProjectOptions(include_assets=include_assets),
-                verbose=True
-            )
+        # Create and save project config
+        project_config = ProjectConfig(
+            name=name,
+            cad_path=cad_file_name,
+            repo_url=remote_url,
+            options=project_options
+        )
 
-            # Copy CAD file to project directory
-            cad_file_name = cad_path.name
-            project_step_file = project_path / cad_file_name
-            shutil.copy2(cad_path, project_step_file)
+        config_path = project_path / "config.yaml"
+        ConfigHelper.save_config(config_path, project_config)
 
-            # Create and save project config
-            project_config = ProjectConfig(
-                name=name,
-                cad_path=cad_file_name,
-                repo_url=remote_url,
-                options=ProjectOptions()
-            )
+        click.echo(f"Project '{name}' has been created at {project_path}")
+        click.echo(f"Configuration file created at {config_path}")
 
-            config_path = project_path / "config.yaml"
-            ConfigHelper.save_config(config_path, project_config)
 
-            click.echo(f"Project '{name}' has been created at {project_path}")
-            click.echo(f"Configuration file created at {config_path}")
+        # Read the content of the template .gitignore file
+        gitignore_content = GITIGNORE_TEMPLATE
 
-            # Initialize a new Git repository
-            subprocess.run(["git", "init", "--initial-branch=main"], cwd=project_path, check=True)
-            # Path to the template .gitignore file
+        # Write the content to the new project's .gitignore file
+        (project_path / ".gitignore").write_text(gitignore_content)
 
-            # Read the content of the template .gitignore file
-            gitignore_content = GITIGNORE_TEMPLATE
-            readme_content = README_TEMPLATE(name, remote_url)
-            # Write the content to the new project's .gitignore file
-            (project_path / ".gitignore").write_text(gitignore_content)
-            (project_path / "README.md").write_text(readme_content)
-            click.echo("Git repository initialized and .gitignore file created.")
 
-            # Make initial commit
-            subprocess.run(["git", "add", "."], cwd=project_path, check=True)
-            subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=project_path, check=True)
-            click.echo("Initial commit made.")
+        # Create the project using CadService
+        project = CadService.create_project(
+            project_path=project_path,
+            cad_file=cad_path,
+            project_options=project_options,
+            verbose=True
+        )
 
-        except Exception as e:
-            click.echo(f"Error: {e}")
+        # Create a README file
+        cover_image_path = f"./assets/{project.root_assembly.long_name}.svg" if include_assets else None
+        readme_content = README_TEMPLATE(name, remote_url, cover_image_path)
+        (project_path / "README.md").write_text(readme_content)
+
+
+        # Initialize a new Git repository
+        subprocess.run(["git", "init", "--initial-branch=main"], cwd=project_path, check=True)
+        click.echo("Git repository initialized")
+
+        # Make initial commit
+        subprocess.run(["git", "add", "."], cwd=project_path, check=True)
+        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=project_path, check=True)
+        click.echo("Initial commit made.")
+
 

@@ -15,9 +15,9 @@ def cli():
 
 @cli.command(name="create")
 @click.option("--name", help="The name of the project", required=False)
-@click.option("--cad_path", help="The path for a step file (CAD/3D) to be processed with the tool", type=click.Path(), required=False)
-@click.option("--remote_url", help="The URL of the remote repository", required=False, default=None)
-@click.option("--include_assets", help="Include assets in the project", is_flag=True, default=False)
+@click.option("--cad-path", help="The path for a step file (CAD/3D) to be processed with the tool", type=click.Path(), required=False)
+@click.option("--remote-url", help="The URL of the remote repository", required=False, default=None)
+@click.option("--include-assets", help="Include assets in the project", is_flag=True, default=False)
 def create_command(name: str, cad_path: str, remote_url: Optional[str], include_assets: bool):
     """Create a new project"""
     from pathlib import Path
@@ -64,15 +64,15 @@ def create_command(name: str, cad_path: str, remote_url: Optional[str], include_
 
     # Create the project
     service = CreateService()
-    try:
-        service.create(name, project_path, cad_path, remote_url, include_assets)
-        logger.info(f"Project '{name}' has been created/updated at {project_path / name}")
-        logger.info(f"Original CAD file: {cad_path}")
-        logger.info(f"CAD file has been copied in the project directory.")
-        logger.info("Project configuration has been created and saved.")
-    except Exception as e:
-        logger.info(f"Error creating/updating project: {e}")
-        return
+    # try:
+    service.create(name, project_path, cad_path, remote_url, include_assets)
+    logger.info(f"Project '{name}' has been created/updated at {project_path / name}")
+    logger.info(f"Original CAD file: {cad_path}")
+    logger.info(f"CAD file has been copied in the project directory.")
+    logger.info("Project configuration has been created and saved.")
+    # except Exception as e:
+    #     logger.info(f"Error creating/updating project: {e}")
+    #     return
 
     logger.info("Project creation/update completed successfully.")
 

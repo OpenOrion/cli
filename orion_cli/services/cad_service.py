@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 from scipy.spatial.transform import Rotation as R
 import shutil
 import cadquery as cq
+from orion_cli.helpers.asset_helper import AssetHelper, SVGOptions
 from orion_cli.helpers.cad_helper import CadHelper
 from cadquery.occ_impl.exporters.svg import getSVG
 import pandas as pd
@@ -32,8 +33,9 @@ ASSETS_DIRECTORY = "assets"
 
 class InventoryPartVariation(BaseModel):
     id: int
-    color: Optional[list[float]] = None
+    color: Optional[list[int]] = None
     price: Optional[float] = None
+    url: Optional[str] = None
 
 class CatalogItem(BaseModel):
     name: str
@@ -55,15 +57,15 @@ class Inventory:
     catalog: dict[PartChecksum, CatalogItem] = field(default_factory=dict)
     
     def get_variation(self, ref: InventoryVariationRef):
-        return self.catalog[ref.checksum].variations[ref.id]
+        return self.catalog[ref.checksum].variations[ref.id-1]
 
-    def get_variation_from_color(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
+    def get_variation_from_color(self, part_checksum: PartChecksum, part_color: Optional[list[int]] = None):
         if part_checksum in self.catalog:
             for variation in self.catalog[part_checksum].variations:
                 if variation.color == part_color:
                     return variation
 
-    def find_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
+    def find_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[int]] = None):
         variation = self.get_variation_from_color(part_checksum, part_color)
         if variation:
             return variation.id
@@ -151,6 +153,10 @@ class Assembly(BaseModel):
         self.children.append(child.path)
 
     @property
+    def long_name(self):
+        return self.path.lstrip("/").replace("/", "-")
+
+    @property
     def name(self):
         return self.path.split("/")[-1]
 
@@ -166,13 +172,14 @@ class Assembly(BaseModel):
             part_variation = project.inventory.get_variation(part_ref.variation)
 
             # TODO: find a better solution to handle negative rotation determinants (mirrors)
+            cq_color = cq.Color(*CadHelper.rgba_int_to_float(part_variation.color)) if part_variation.color else None
             if cq_loc and cq_loc.wrapped.Transformation().IsNegative():
                 part_abs_location = Location.convert(part_ref.location).transform(abs_location)
                 aligned_part = CadHelper.transform_solid(part, part_abs_location.orientation, part_abs_location.position)
-                cq_assembly.add(aligned_part, color=cq.Color(*part_variation.color), name=part_ref.name)
+                cq_assembly.add(aligned_part, color=cq_color, name=part_ref.name)
             else:
                 cq_assembly.add(
-                    part, color=cq.Color(*part_variation.color), name=part_ref.name, loc=cq_loc
+                    part, color=cq_color, name=part_ref.name, loc=cq_loc
                 )
 
         return cq_assembly
@@ -284,7 +291,7 @@ class CadService:
                 part_variation = CadService.get_part_variation(cq_subassembly, part_ref, index)
                 if part_checksum not in project.inventory.catalog:
                     project.inventory.catalog[part_checksum] = CatalogItem(name=part_ref.name, variations=[part_variation])
-                elif part_ref.variation.id >= len(project.inventory.catalog[part_checksum].variations):
+                elif part_ref.variation.id > len(project.inventory.catalog[part_checksum].variations):
                     project.inventory.catalog[part_checksum].variations.append(part_variation)
 
                 CadService.assign_unique_part_names(part_ref, project, index)
@@ -321,7 +328,7 @@ class CadService:
     @staticmethod
     def get_part_variation(cq_subassembly: cq.Assembly, part_ref: PartRef, index: AssemblyIndex):
         # derive variation from color
-        part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+        part_color = list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple())) if cq_subassembly.color else None
         variation = InventoryPartVariation(id=part_ref.variation.id, color=part_color)
 
         # if variation already exists in previous project state, update it
@@ -356,7 +363,7 @@ class CadService:
         base_part = cast(cq.Solid, cast(cq.Workplane, cq_subassembly.obj).val())
         part_checksum = CadHelper.get_part_checksum(base_part)
         
-        part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+        part_color = list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple())) if cq_subassembly.color else None
         variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 1
         location = Location.convert(cq_subassembly.loc)
         part_ref = PartRef(
@@ -415,7 +422,7 @@ class CadService:
             rotmat = rotmat.dot(rot_mat_adjustment)
                     
         part_checksum = CadHelper.get_part_checksum(base_part)
-        part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
+        part_color = list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple())) if cq_subassembly.color else None
         variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 1
 
         part_ref = PartRef(
@@ -449,13 +456,14 @@ class CadService:
                 project_path = Path(project_path)
                 svg_path = (project_path / f"./assets/{catalog_item.name}.svg").relative_to(project_path)
             for variation in catalog_item.variations:
-                color_str = ",".join(map(lambda val: str(int(255*val)), variation.color or [1,1,1]))
+                color_str = ",".join(map(str, variation.color or [1,1,1]))
                 data_item = {
                     "Part": "", 
                     "Name": f"{catalog_item.name}", 
-                    "No.": variation.id, 
+                    "Variation": variation.id, 
                     "Color": f"<span style='color:rgb({color_str})'>&#9724;</span>", 
-                    "Price": f"${variation.price}" if variation.price else "-"
+                    "Price": f"${variation.price}" or "-",
+                    "URL": variation.url or "-"
                 }
                 if svg_path and variation.id == 1:
                     data_item["Part"] = f"![{catalog_item.name}-{variation.id}](../{svg_path})"
@@ -499,6 +507,7 @@ class CadService:
     def write_assets(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
 
+
         project_path = Path(project_path)
         assets_path = project_path / ASSETS_DIRECTORY
         inventory_path = project_path / INVENTORY_DIRECTORY
@@ -508,13 +517,17 @@ class CadService:
 
         # Generate SVGs for each part if they are modified or don't exist
         part_names = set()
+        part_svg_options = SVGOptions(showAxes=False, marginLeft=20)
+        # part_svg_options = {"showAxes": False, "marginLeft": 20}
         for checksum, catalog_item in project.inventory.catalog.items():
             part = project.inventory.parts[checksum]
             part_names.add(catalog_item.name)
             svg_path = assets_path / f"{catalog_item.name}.svg"
             if not index or index and checksum in index.is_part_modified or not svg_path.exists():
                 logger.info(f"- Generating SVG for part '{catalog_item.name}'")
-                svg = getSVG(part, {"showAxes": False, "marginLeft": 20})
+                svg = AssetHelper.getSVG(part, part_svg_options)
+                # svg = getSVG(part, part_svg_options)
+
                 with open(svg_path, "w") as f:
                     f.write(svg)
 
@@ -524,10 +537,24 @@ class CadService:
             inventory_md = CadService.get_inventory_markdown(project.inventory, assets_path)
             f.write(inventory_md)
 
-        logger.info("- Removing SVG files not in inventory")
+        # Generate SVG for root assembly
+        root_assembly_svg_path = assets_path / f"{project.root_assembly.long_name}.svg"
+        if not index or index and project.root_assembly.path in index.is_assembly_modified or not root_assembly_svg_path.exists():
+            logger.info(f"- Generating SVG for root assembly '{project.root_assembly.name}', this may take a sec ...")
+            root_assembly_cq = project.root_assembly.to_cq(project)
+            assembly_svg_options = SVGOptions(showAxes=False, marginLeft=20, showHidden=False, strokeWidth=-0.9)
+            # assembly_svg_options = {"showAxes": False, "marginLeft": 20, "showHidden": False, "strokeWidth": -0.9}
+            root_assembly_svg = AssetHelper.getSVG(root_assembly_cq, assembly_svg_options)
+            # root_assembly_svg = getSVG(root_assembly_cq.toCompound(), assembly_svg_options)
+
+            with open(root_assembly_svg_path, "w") as f:
+                f.write(root_assembly_svg)
+
+        logger.info("\n\n- Removing SVG files not in inventory")
         for svg_path in assets_path.glob("*.svg"):
-            if svg_path.stem not in part_names:
+            if svg_path.stem not in part_names and svg_path != root_assembly_svg_path:
                 svg_path.unlink()
+
 
 
     @staticmethod
@@ -577,7 +604,7 @@ class CadService:
 
     @staticmethod
     def create_project(
-        project_path: Path,
+        project_path: Optional[Path] = None,
         cad_file: Optional[Path] = None,
         project_options: Optional[ProjectOptions] = None,
         verbose=False
@@ -590,7 +617,9 @@ class CadService:
             logger.info(f"\n\nLoading in step file {cad_file}")
             cq_assembly = CadHelper.import_cad(cad_file)
             CadService.read_cq_assembly(cq_assembly, project)
-        CadService.write_project(project_path, project, verbose=verbose)
+        if project_path:
+            CadService.write_project(project_path, project, verbose=verbose)
+        return project
 
     @staticmethod
     def revise_project(project_path: Path, cad_path: Path, write=False, project_options: Optional[ProjectOptions] = None, verbose=False):

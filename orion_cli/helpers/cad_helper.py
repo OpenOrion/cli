@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import pickle
-from typing import Optional, Union, cast
+from typing import Iterable, Optional, Union, cast
 from cachetools import LRUCache
 import numpy as np
 from OCP.GProp import GProp_GProps
@@ -30,6 +30,32 @@ class Mesh:
 
 
 class CadHelper:
+    @staticmethod
+    def rgba_int_to_float(rgb_int: Iterable[float]):
+        """
+        Convert an integer-based RGB tuple (0-255) to a float-based RGB tuple (0.0-1.0). Alpha value is not converted.
+
+        Args:
+        rgb_int (tuple): A tuple of three integers representing RGB values.
+
+        Returns:
+        tuple: A tuple of three floats representing RGB values.
+        """
+        return tuple([x / 255.0 if i < 3 else x for i, x in enumerate(rgb_int)])
+    
+    @staticmethod
+    def rgba_float_to_int(rgb_float: Iterable[float]):
+        """
+        Convert a float-based RGB tuple (0.0-1.0) to an integer-based RGB tuple (0-255). Alpha value is not converted.
+
+        Args:
+        rgb_float (tuple): A tuple of three floats representing RGB values.
+
+        Returns:
+        tuple: A tuple of three integers representing RGB values.
+        """
+        return tuple([int(x * 255) if i < 3 else x for i, x in enumerate(rgb_float)])
+    
     @staticmethod
     def vertex_to_Tuple(vertex: TopoDS_Vertex):
         geom_point = BRep_Tool.Pnt_s(vertex)

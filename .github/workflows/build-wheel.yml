@@ -1,4 +1,4 @@
-name: Build Wheels
+name: Build wheel and Release to pypi
 
 on:
   workflow_dispatch
@@ -37,3 +37,10 @@ jobs:
 
       - name: List built wheels
         run: ls dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          verbose: true
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}

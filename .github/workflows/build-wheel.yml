@@ -1,0 +1,39 @@
+name: Build Wheels
+
+on:
+  workflow_dispatch
+  # push:
+  #   branches: [ master ]
+
+env:
+  PYTHONUTF8: 1
+
+jobs:
+  build:
+    name: Build Wheels
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.11'
+
+      - name: Install Poetry
+        run: |
+          curl -sSL https://install.python-poetry.org | python3 -
+          export PATH="$HOME/.local/bin:$PATH"
+
+      - name: Install dependencies
+        run: |
+          poetry install
+
+      - name: Build wheels
+        run: |
+          poetry build
+
+      - name: List built wheels
+        run: ls dist/

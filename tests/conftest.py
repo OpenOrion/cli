@@ -1,4 +1,3 @@
-# tests/conftest.py
 import pytest
 import os
 from click.testing import CliRunner
@@ -6,10 +5,12 @@ from orion_cli.cli import cli
 from pathlib import Path
 import shutil
 
+# tests/conftest.py
+
 @pytest.fixture(scope="module")
 def robot_step_file():
-    test_data_dir = os.path.join(os.path.dirname(__file__), 'test_data/step')
-    step_file = os.path.join(test_data_dir, 'Robot.step')
+    test_data_dir = Path(__file__).resolve().parent / 'test_data/step'
+    step_file = test_data_dir / 'Robot.step'
     return step_file
 
 @pytest.fixture(scope="module")
@@ -18,7 +19,7 @@ def module_tmp_path(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def create_project(module_tmp_path: Path, robot_step_file: Path):
-    file_name = os.path.basename(robot_step_file).split('.')[0]
+    file_name = robot_step_file.stem
 
     runner = CliRunner()
     result = runner.invoke(cli, ['create'], input=f'{file_name}\n{robot_step_file}\nN\n')
@@ -31,7 +32,7 @@ def create_project(module_tmp_path: Path, robot_step_file: Path):
     yield project_path
 
     # Clean up the created project
-    if os.path.exists(project_path):
+    if project_path.exists():
         shutil.rmtree(project_path)
 
 @pytest.fixture(scope="module")

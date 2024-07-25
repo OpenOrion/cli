@@ -68,9 +68,9 @@ class Inventory:
         if variation:
             return variation.id
         elif part_checksum in self.catalog:
-            return len(self.catalog[part_checksum].variations)
+            return len(self.catalog[part_checksum].variations) + 1
         else:
-            return 0
+            return 1
 class Location(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     position: NdArray
@@ -357,7 +357,7 @@ class CadService:
         part_checksum = CadHelper.get_part_checksum(base_part)
         
         part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
-        variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 0
+        variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 1
         location = Location.convert(cq_subassembly.loc)
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
@@ -416,7 +416,7 @@ class CadService:
                     
         part_checksum = CadHelper.get_part_checksum(base_part)
         part_color =list(cq_subassembly.color.toTuple()) if cq_subassembly.color else None
-        variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 0
+        variation_id = inventory.find_variation_id(part_checksum, part_color) if inventory else 1
 
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
@@ -440,18 +440,31 @@ class CadService:
         return base_part, part_ref
 
     @staticmethod
-    def get_inventory_markdown(inventory: Inventory, assets_path: Path):
+    def get_inventory_markdown(inventory: Inventory, project_path: Union[str, Path, None] = None):
         md = "# Inventory\n"
-
         data = []
         for catalog_item in inventory.catalog.values():
-          svg_path = assets_path / f"{catalog_item.name}.svg"
-          data_item = {"": f"![{svg_path}](../{svg_path})", "Name": catalog_item.name}
-          data.append(data_item)
+            svg_path =  None
+            if project_path:
+                project_path = Path(project_path)
+                svg_path = (project_path / f"./assets/{catalog_item.name}.svg").relative_to(project_path)
+            for variation in catalog_item.variations:
+                color_str = ",".join(map(lambda val: str(int(255*val)), variation.color or [1,1,1]))
+                data_item = {
+                    "Part": "", 
+                    "Name": f"{catalog_item.name}", 
+                    "No.": variation.id, 
+                    "Color": f"<span style='color:rgb({color_str})'>&#9724;</span>", 
+                    "Price": f"${variation.price}" if variation.price else "-"
+                }
+                if svg_path and variation.id == 1:
+                    data_item["Part"] = f"![{catalog_item.name}-{variation.id}](../{svg_path})"
+                if variation.id > 1:
+                    data_item["Name"] = "\n"
+                data.append(data_item)
 
         # Create a DataFrame
         df = pd.DataFrame(data)
-
 
         return md + df.to_markdown(index=False)
 

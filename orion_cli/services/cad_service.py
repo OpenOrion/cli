@@ -125,12 +125,18 @@ class Location(BaseModel):
             return Location(position=np.zeros(3), orientation=np.eye(3))
         if isinstance(loc, Location):
             return loc
-        translation, euler_angles = loc.toTuple()
-        rotmat = R.from_euler("xyz", euler_angles, degrees=True).as_matrix()
+
+        transformation = loc.wrapped.Transformation()
+        translation = np.array([transformation.Value(1, 4), transformation.Value(2, 4), transformation.Value(3, 4)])
+        rotmat = np.array([
+            [transformation.Value(1, 1), transformation.Value(1, 2), transformation.Value(1, 3)],
+            [transformation.Value(2, 1), transformation.Value(2, 2), transformation.Value(2, 3)],
+            [transformation.Value(3, 1), transformation.Value(3, 2), transformation.Value(3, 3)],
+        ])
 
         return Location(
-            position=np.array(translation),
-            orientation=(rotmat)
+            position=translation,
+            orientation=rotmat
         )
 
 

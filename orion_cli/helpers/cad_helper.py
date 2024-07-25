@@ -259,6 +259,7 @@ class CadHelper:
         )
 
         rounded_vertices = np.round(vertices, precision)
+        rounded_vertices[rounded_vertices == -0] = 0
 
         sorted_indices = np.lexsort(rounded_vertices.T)
         sorted_vertices = rounded_vertices[sorted_indices]

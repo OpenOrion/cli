@@ -54,7 +54,7 @@ class CadHelper:
         Returns:
         tuple: A tuple of three integers representing RGB values.
         """
-        return tuple([int(x * 255) if i < 3 else x for i, x in enumerate(rgb_float)])
+        return tuple([float(int(x * 255)) if i < 3 else x for i, x in enumerate(rgb_float)])
     
     @staticmethod
     def vertex_to_Tuple(vertex: TopoDS_Vertex):

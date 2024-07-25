@@ -11,7 +11,6 @@ import shutil
 import cadquery as cq
 from orion_cli.helpers.asset_helper import AssetHelper, SVGOptions
 from orion_cli.helpers.cad_helper import CadHelper
-from cadquery.occ_impl.exporters.svg import getSVG
 import pandas as pd
 from orion_cli.helpers.numpy_helper import NdArray
 from orion_cli.services.log_service import logger
@@ -31,12 +30,16 @@ PARTS_DIRECTORY = "inventory/parts"
 ASSEMBLY_DIRECTORY = "assemblies"
 ASSETS_DIRECTORY = "assets"
 
-class InventoryPartVariation(BaseModel):
-    id: int
-    color: Optional[list[int]] = None
+class InvetoryPartVariationMetadata(BaseModel):
     price: Optional[float] = None
     url: Optional[str] = None
 
+class InventoryPartVariation(BaseModel):
+    id: int
+    references: set[AssemblyPath] = Field(default_factory=set)
+    color: Optional[list[float]] = None
+    metadata: Optional[InvetoryPartVariationMetadata] = None
+    
 class CatalogItem(BaseModel):
     name: str
     variations: list[InventoryPartVariation]
@@ -48,29 +51,33 @@ class InventoryVariationRef(BaseModel):
     def __hash__(self):
         return hash((self.checksum, self.id))
 
+class InventoryCatalog(BaseModel):
+    items: dict[PartChecksum, CatalogItem] = {}
+
+
 @dataclass
 class Inventory:
     """
     Catalog of all parts in the project
     """
     parts: dict[PartChecksum, cq.Solid] = field(default_factory=dict)
-    catalog: dict[PartChecksum, CatalogItem] = field(default_factory=dict)
+    catalog: InventoryCatalog = field(default_factory=InventoryCatalog)
     
     def get_variation(self, ref: InventoryVariationRef):
-        return self.catalog[ref.checksum].variations[ref.id-1]
+        return self.catalog.items[ref.checksum].variations[ref.id-1]
 
-    def get_variation_from_color(self, part_checksum: PartChecksum, part_color: Optional[list[int]] = None):
-        if part_checksum in self.catalog:
-            for variation in self.catalog[part_checksum].variations:
+    def get_variation_from_color(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
+        if part_checksum in self.catalog.items:
+            for variation in self.catalog.items[part_checksum].variations:
                 if variation.color == part_color:
                     return variation
 
-    def find_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[int]] = None):
+    def find_variation_id(self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None):
         variation = self.get_variation_from_color(part_checksum, part_color)
         if variation:
             return variation.id
-        elif part_checksum in self.catalog:
-            return len(self.catalog[part_checksum].variations) + 1
+        elif part_checksum in self.catalog.items:
+            return len(self.catalog.items[part_checksum].variations) + 1
         else:
             return 1
 class Location(BaseModel):
@@ -288,11 +295,28 @@ class CadService:
                 
                 # add part variation to index
                 part_checksum = part_ref.variation.checksum
-                part_variation = CadService.get_part_variation(cq_subassembly, part_ref, index)
-                if part_checksum not in project.inventory.catalog:
-                    project.inventory.catalog[part_checksum] = CatalogItem(name=part_ref.name, variations=[part_variation])
-                elif part_ref.variation.id > len(project.inventory.catalog[part_checksum].variations):
-                    project.inventory.catalog[part_checksum].variations.append(part_variation)
+
+                # derive variation from color
+                part_color = list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple())) if cq_subassembly.color else None
+                existing_variation = project.inventory.get_variation_from_color(part_ref.variation.checksum, part_color)
+                
+                if part_checksum not in project.inventory.catalog.items:
+                    project.inventory.catalog.items[part_checksum] = CatalogItem(name=part_ref.name, variations=[])
+                
+                # if variation does not exist, create a new one, otherwise add part reference
+                if not existing_variation:
+                    part_variation = InventoryPartVariation(id=part_ref.variation.id, references={part_ref.path}, color=part_color)
+                    project.inventory.catalog.items[part_checksum].variations.append(part_variation)
+                else:
+                    existing_variation.references.add(part_ref.path)
+                    part_variation = existing_variation
+                
+                # keep the metadata from the previous project
+                if index and index.prev_project:
+                    prev_variation = index.prev_project.inventory.get_variation_from_color(part_ref.variation.checksum, part_color)
+                    if prev_variation and not part_variation.metadata:
+                        part_variation.metadata = prev_variation.metadata
+
 
                 CadService.assign_unique_part_names(part_ref, project, index)
 
@@ -312,32 +336,18 @@ class CadService:
                 prev_path_strs = prev_part_ref.path.split("/")
                 prev_part_name = '-'.join(prev_path_strs[min(project.options.max_name_depth, len(prev_path_strs)):])
                 assert prev_part_name not in index.part_names, f"part name {prev_part_name} already exists"
-                project.inventory.catalog[prev_part_ref.variation.checksum].name = prev_part_name
+                project.inventory.catalog.items[prev_part_ref.variation.checksum].name = prev_part_name
 
                 # modifying the current part name
                 path_strs = part_ref.path.split("/")
                 part_name = '-'.join(path_strs[min(project.options.max_name_depth, len(path_strs)):])
                 assert part_name not in index.part_names, f"part name {part_name} already exists"
-                project.inventory.catalog[part_ref.variation.checksum].name = part_name
+                project.inventory.catalog.items[part_ref.variation.checksum].name = part_name
 
         else:
             # add part name to index with part_ref it pertains to
             index.part_names[part_name] = part_ref
-            project.inventory.catalog[part_ref.variation.checksum].name = part_name
-
-    @staticmethod
-    def get_part_variation(cq_subassembly: cq.Assembly, part_ref: PartRef, index: AssemblyIndex):
-        # derive variation from color
-        part_color = list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple())) if cq_subassembly.color else None
-        variation = InventoryPartVariation(id=part_ref.variation.id, color=part_color)
-
-        # if variation already exists in previous project state, update it
-        if index.prev_project:
-            prev_variation = index.prev_project.inventory.get_variation_from_color(part_ref.variation.checksum, part_color)
-            if prev_variation:
-                variation = prev_variation.model_copy()
-                variation.id = part_ref.variation.id
-        return variation
+            project.inventory.catalog.items[part_ref.variation.checksum].name = part_name
 
 
     @staticmethod
@@ -450,7 +460,7 @@ class CadService:
     def get_inventory_markdown(inventory: Inventory, project_path: Union[str, Path, None] = None):
         md = "# Inventory\n"
         data = []
-        for catalog_item in inventory.catalog.values():
+        for catalog_item in inventory.catalog.items.values():
             svg_path =  None
             if project_path:
                 project_path = Path(project_path)
@@ -461,9 +471,10 @@ class CadService:
                     "Part": "", 
                     "Name": f"{catalog_item.name}", 
                     "Variation": variation.id, 
+                    "Quantity": len(variation.references),
                     "Color": f"<span style='color:rgb({color_str})'>&#9724;</span>", 
-                    "Price": f"${variation.price}" or "-",
-                    "URL": variation.url or "-"
+                    "Price": f"${variation.metadata.price}" if variation.metadata and variation.metadata.price else  "-",
+                    "URL": variation.metadata.url if variation.metadata and variation.metadata.url else "-"
                 }
                 if svg_path and variation.id == 1:
                     data_item["Part"] = f"![{catalog_item.name}-{variation.id}](../{svg_path})"
@@ -493,15 +504,14 @@ class CadService:
 
         # Generate BREP files for each part
         for checksum, part in inventory.parts.items():
-            part_name = inventory.catalog[checksum].name
+            part_name = inventory.catalog.items[checksum].name
             brep_path = parts_path / f"{part_name}.brep"
             with open(brep_path, "w") as f:
                 CadHelper.export_brep(part.wrapped, f"{brep_path}")
                 logger.info(f"- Exported part '{part_name}'")
 
         with open(inventory_path / "catalog.json", "w") as f:
-            serialized_items = {key: model.model_dump() for key, model in inventory.catalog.items()}
-            json.dump(serialized_items, f, indent=4)
+            f.write(inventory.catalog.model_dump_json(indent=4))
 
     @staticmethod
     def write_assets(project_path: Union[Path, str], project: Project, index: Optional[AssemblyIndex] = None, verbose=False):
@@ -519,7 +529,7 @@ class CadService:
         part_names = set()
         part_svg_options = SVGOptions(showAxes=False, marginLeft=20)
         # part_svg_options = {"showAxes": False, "marginLeft": 20}
-        for checksum, catalog_item in project.inventory.catalog.items():
+        for checksum, catalog_item in project.inventory.catalog.items.items():
             part = project.inventory.parts[checksum]
             part_names.add(catalog_item.name)
             svg_path = assets_path / f"{catalog_item.name}.svg"
@@ -650,14 +660,14 @@ class CadService:
         parts_path = inventory_path / "parts"
 
         with open(inventory_path / "catalog.json", "r") as f:
-            catalog = dict(json.load(f))
-            for checksum, catalog_item in catalog.items():
+            catalog = InventoryCatalog.model_validate_json(f.read())
+            for checksum, catalog_item in catalog.items.items():
                 catalog_item = CatalogItem.model_validate(catalog_item)
                 brep_path = parts_path / f"{catalog_item.name}.brep"
                 project.inventory.parts[checksum] = cq.Solid(
                     CadHelper.import_brep(brep_path)
                 )
-                project.inventory.catalog[checksum] = catalog_item
+                project.inventory.catalog.items[checksum] = catalog_item
 
         assembly_path = project_path / ASSEMBLY_DIRECTORY
 

@@ -34,7 +34,9 @@ Make sure you have Python 3.9 or higher installed before running the command.
 
 ## Usage
 
-After installing the dependencies, you can run the CLI commands using Poetry. Here are some examples:
+> ⚠️ **Note:** The first time you use Orion CLI, it may be slow as it configures some dependencies. Please be patient during this initial setup process.
+
+After installing via pip you can commands as follows:
 
 ### Create a New Project
 
@@ -172,7 +174,11 @@ Please note that this command assumes you have already created a revision for yo
 
 ### Display the project
 
-To view the reconstructed CAD project, you can use the `orion display` command. This command should be run from inside the project directory.
+To view the reconstructed CAD project, you can use the `orion display` command. This command should be run from inside the project directory:
+
+```bash
+orion deploy
+```
 
 When you run the `orion display` command, it will generate an `index.html` file in the `.orion_cache` folder of the project. You can open this file in a web browser to view the project reconstructed into CAD.
 

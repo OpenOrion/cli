@@ -12,6 +12,7 @@ Orion CLI is a command-line interface (CLI) tool designed for managing projects 
 - Create new projects from step file
 - Create revisions changes to step file
 - Deploy changes to remote git repository.
+- Display project 
 
 ## Requirements
 
@@ -67,41 +68,112 @@ robot
 └── inventory
 ```
 
-In the "robot" directory, you will find the `README.md` file, the `Robot.step` file (which is the provided step file), the `assemblies` folder (containing deconstructed assemblies and subassemblies), the `config.yaml` file (with project specific configurations), and the `inventory` folder (containing all individual parts).
-
-This structure allows you to easily manage and organize your project files within the Orion CLI.
+In the "robot" directory, you will find the `README.md` file with project information, the `Robot.step` file (which is the duplicate of the step file), the `assemblies` folder (containing deconstructed assemblies and subassemblies), the `config.yaml` file (with project specific configurations), and the `inventory` folder (containing all individual parts). Once the project creation is complete Orion CLI will initialize a new git repository in the project folder and create an initial commit.
 
 #### Inventory
 
+The inventory folder will include breps of all parts in the assembly and a `catalog.json` file containing part and assembly metadata.
+
+Here is an example structure of the inventory folder:
+
+```
+inventory
+├── catalog.json
+└── parts
+    ├── 2995K11_Swivel_Joint_<2>_0-Part_1_0.brep
+    ├── 51T_HDT5_15MM_Belt_Knee_Left_0.brep
+    ├── 6mm_Bearing_5.brep
+    ├── 92981A105_Alloy_Steel_Shoulder_Screws_3.brep
+    ├── Ankle_0.brep
+    ├── Arducam_Case_0.brep
+    ├── Base_0.brep
+    ├── Belt_Thigh_Left_0.brep
+    ├── Bottom_Torso_Lower_Half_0.brep
+    ├── Camera_Mount_0.brep
+    ├── Elbow_0.brep
+    ├── Foot_0.brep
+    ├── Gripper_1.brep
+    ├── Head_0.brep
+    ├── Hips_0.brep
+    ├── LCD_1.brep
+    ├── Neck_0.brep
+    ├── Right_Leg_<1>_0-X10_<1>_0-Inner_0.brep
+    ├── Shoulder_Inner_0.brep
+    ├── Spur_gear__26_teeth__0.brep
+    ├── Thigh_HTD_5mm_44T_Pulley_0.brep
+    ├── Top_Torso_0.brep
+    ├── Wrist_0.brep
+    ├── X4_<1>_0-Inner_0.brep
+    ├── X6_<2>_0-Inner_0.brep
+    └── XPT2046_Touch_0.brep
+
+```
+
+### Assemblies
+
+The `assemblies` folder contains a nested directory structure that represents all the subassemblies in the project step file. Each subassembly is organized in its own directory within the `assemblies` folder.
+
+Here is an example structure of the `assemblies` folder:
+
+```
+assemblies
+└── Robot
+    ├── Head_<1>_0
+    │   ├── X4_<1>_0
+    │   ├── X4_<2>_0
+    │   └── assembly.json
+    ├── Left_Arm_<2>_0
+    │   ├── Hand_<1>_0
+    │   │   ├── X4_<1>_0
+    │   │   ├── X4_<2>_0
+    │   │   └── assembly.json
+    │   ├── X4_<1>_0
+    │   ├── X6_<1>_0
+    │   ├── X6_<2>_0
+    │   ├── X8_<1>_0
+    │   └── assembly.json
+    └── assembly.json
+
+```
+
+This nested directory structure helps organize and manage the subassemblies within the project, making it easier to navigate and work with the individual components.
 
 ### Create a Revision for a Project
 
-To create a new revision for a project, run:
+If you have made changes to your step file or modified the step file in the project directory, you may want your project directory to reflect these changes. The `orion revision` command allows you to create a revision for your project.
+
+To create a revision from inside the project directory using the project step file, run the following command from inside your project directory:
 
 ```bash
 orion revision
 ```
 
-Expected output:
+If you want to create revision from step file outside the current project directory `/a/path/to/cad/robot.step`, you can run the following command:
 
+```bash
+orion revision --cad_path /a/path/to/cad/robot.step
 ```
-Your project has been revisioned
-```
+
+After running the command, your project should be updated and you will be asked if you would like to stage the changes.
 
 ### Deploy the project
 
-To deploy a revisioned, project run:
+To deploy a revisioned project, you can use the `orion deploy` command. Before using this command, make sure you have set a remote URL for your project either during the creation process or manually in the `config.yaml` file under the `repo_url` field. Additionally, ensure that you have git properly configured on your system and are inside the project directory.
+
+To deploy the project, navigate to the project directory and run the following command:
 
 ```bash
 orion deploy
 ```
 
-Expected output:
+You will be prompted to enter a deployment message. Once you provide the message, the command will push the project to the remote repository.
 
-```
-Your project has been deployed
-```
+Please note that this command assumes you have already created a revision for your project using the `orion revision` command.
 
-## License
+### Display the project
 
-[Coming soon]
+To view the reconstructed CAD project, you can use the `orion display` command. This command should be run from inside the project directory.
+
+When you run the `orion display` command, it will generate an `index.html` file in the `.orion_cache` folder of the project. You can open this file in a web browser to view the project reconstructed into CAD.
+
+Please note that the `orion display` command requires the project to have already been created.

@@ -23,8 +23,7 @@ def test_create_command_no_changes_to_stage(create_project: Path):
 @pytest.mark.usefixtures("create_project")
 def test_create_command_config_file(create_project: Path):
     project_path = create_project
-    file_name = os.path.basename(project_path)
-    config_file = os.path.join(project_path, 'config.yaml')
+    config_file = project_path / 'config.yaml'
 
     assert os.path.isfile(config_file), f"Config file {config_file} does not exist."
 
@@ -34,8 +33,8 @@ def test_create_command_config_file(create_project: Path):
 
     # Check if the config matches the expected values
     
-    assert config.cad_path == str(file_name + '.step'), f"Config cad_path {config.cad_path} does not match expected value {file_name + '.step'}"
-    assert config.name == file_name, f"Config name {config.name} does not match expected value {file_name}"
+    assert config.cad_path == f"{project_path.stem}.step", f"Config cad_path {config.cad_path} does not match expected value {file_name + '.step'}"
+    assert config.name == project_path.stem, f"Config name {config.name} does not match expected value {file_name}"
     assert config.repo_url == None, f"Config repo_url {config.repo_url} does not match expected value None"
     assert config.options.max_name_depth == 3, f"Config options.max_name_depth {config.options.max_name_depth} does not match expected value 3"
     assert config.options.normalize_axis == False, f"Config options.normalize_axis {config.options.normalize_axis} does not match expected value False"

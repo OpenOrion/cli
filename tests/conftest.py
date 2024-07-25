@@ -19,15 +19,15 @@ def module_tmp_path(tmp_path_factory):
 
 @pytest.fixture(scope="module")
 def create_project(module_tmp_path: Path, robot_step_file: Path):
-    file_name = robot_step_file.stem
+    project_name = robot_step_file.stem
 
     runner = CliRunner()
-    result = runner.invoke(cli, ['create'], input=f'{file_name}\n{robot_step_file}\nN\n')
+    result = runner.invoke(cli, ['create'], input=f'{project_name}\n{robot_step_file}\nN\n')
     assert result.exit_code == 0
 
     # Move the created project directory to the temporary path
-    project_path = module_tmp_path / file_name
-    shutil.move(file_name, project_path)
+    project_path = module_tmp_path / project_name
+    shutil.move(project_name, project_path)
 
     yield project_path
 

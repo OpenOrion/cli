@@ -5,7 +5,7 @@ Command-line tool for Open Orion PLM.
 
 ## Description
 
-Orion CLI is a command-line interface (CLI) tool designed for managing projects within the Open Orion PLM system.
+Orion CLI is a command-line interface (CLI) tool designed for managing projects within the Open Orion PDM system.
 
 ## Features
 
@@ -44,6 +44,9 @@ To create a new project, run:
 
 ```bash
 orion create
+
+# to include svg and markdown assets
+orion create --include-assets
 ```
 
 To create a new project, you will be prompted for the following information:

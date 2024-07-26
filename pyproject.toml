@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "orion-cli"
-version = "0.1.1"
+version = "0.1.2"
 description = "Command-line tool for Open Orion PLM"
 authors = ["Afshawn Lotfi <afshawn@openorion.org>", "Christian <christian@openorion.org>"]
 readme = "README.md"

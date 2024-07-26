@@ -7,6 +7,8 @@ Command-line tool for Open Orion PLM.
 
 Orion CLI is a command-line interface (CLI) tool designed for managing projects within the Open Orion PDM system.
 
+[YouTube Demo](https://www.youtube.com/watch?v=QfzNhCsARKY)
+
 ## Features
 
 - Create new projects from step file

@@ -77,7 +77,5 @@ class CreateService(BaseService):
 
         # Make initial commit
         subprocess.run(["git", "add", "."], cwd=project_path, check=True)
-        subprocess.run(["git", "commit", "-m", "Initial commit"], cwd=project_path, check=True)
-        click.echo("Initial commit made.")
 
 

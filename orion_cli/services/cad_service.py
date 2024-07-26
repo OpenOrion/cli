@@ -36,7 +36,7 @@ class InvetoryPartVariationMetadata(BaseModel):
 
 class InventoryPartVariation(BaseModel):
     id: int
-    references: set[AssemblyPath] = Field(default_factory=set)
+    references: list[AssemblyPath] = Field(default_factory=list)
     color: Optional[list[float]] = None
     metadata: Optional[InvetoryPartVariationMetadata] = None
     
@@ -311,10 +311,11 @@ class CadService:
                 
                 # if variation does not exist, create a new one, otherwise add part reference
                 if not existing_variation:
-                    part_variation = InventoryPartVariation(id=part_ref.variation.id, references={part_ref.path}, color=part_color)
+                    part_variation = InventoryPartVariation(id=part_ref.variation.id, references=[part_ref.path], color=part_color)
                     project.inventory.catalog.items[part_checksum].variations.append(part_variation)
                 else:
-                    existing_variation.references.add(part_ref.path)
+                    if part_ref.path not in existing_variation.references:
+                        existing_variation.references.append(part_ref.path)
                     part_variation = existing_variation
                 
                 # keep the metadata from the previous project
@@ -652,7 +653,7 @@ class CadService:
         CadService.read_cq_assembly(cq_assembly, revised_project, index)
 
         if write:
-            CadService.write_project(project_path, revised_project, verbose=verbose)
+            CadService.write_project(project_path, revised_project, index, verbose=verbose)
         
         return revised_project
 
@@ -688,7 +689,7 @@ class CadService:
         return project
 
     @staticmethod
-    def visualize_project(project_path: Union[Path, str], remote_viewer=False, export_html=True, verbose=True):
+    def visualize_project(project_path: Union[Path, str], remote_viewer=False, export_html=True, auto_open=True, verbose=True):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
 
         project_path = Path(project_path)
@@ -703,5 +704,10 @@ class CadService:
         viewer = CadHelper.get_viewer(cq_assembly, orion_cache_path / "tesselation.cache", remote_viewer)
         
         if viewer and export_html:
-            viewer.export_html(str(orion_cache_path / "index.html"))
-            logger.info(f"Exported HTML to {orion_cache_path / 'index.html'}, open in browser to view")
+            html_path = orion_cache_path / 'index.html'
+            viewer.export_html(str(html_path))
+            logger.info(f"\n\nExported HTML to {html_path}")
+            # open html in browser
+            # if auto_open:
+            import webbrowser
+            webbrowser.open(f"file://{html_path}")

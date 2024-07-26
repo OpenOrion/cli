@@ -1,17 +1,28 @@
 from pathlib import Path
 from typing import Optional, Union
 import click
-import os
-
 from orion_cli.services.display_service import DisplayService
 from orion_cli.services.log_service import logger
 from typing import Optional
+import pkg_resources
+
+version = pkg_resources.get_distribution("orion_cli").version
+
+logo = """
+  ____      _             _______   ____
+ / __ \____(_)__  ___    / ___/ /  /  _/
+/ /_/ / __/ / _ \/ _ \  / /__/ /___/ /  
+\____/_/ /_/\___/_//_/  \___/____/___/ 
+"""
+
+click.echo(logo)
 
 
 @click.group()
-@click.version_option()
+@click.version_option(version=version)
 def cli():
     """Command-line tool for Open Orion PLM"""
+    
 
 @cli.command(name="create")
 @click.option("--name", help="The name of the project", required=False)
@@ -28,7 +39,7 @@ def create_command(name: str, cad_path: str, remote_url: Optional[str], include_
     project_path = Path.cwd()
 
 
-    name = click.prompt("Please enter the project name")
+    name = str(click.prompt("Please enter the project name")).strip()
 
     full_project_path = project_path / name
 
@@ -44,7 +55,7 @@ def create_command(name: str, cad_path: str, remote_url: Optional[str], include_
 
     # Prompt the user for inputs if not provided
     if not cad_path:
-        cad_path = click.prompt("CAD file (*.step, *.stp)", type=click.Path(exists=True))
+        cad_path = str(click.prompt("CAD file (*.step, *.stp)", type=click.Path(exists=True))).strip()
 
     if not remote_url:
         provide_remote_url = click.confirm("Would you like to provide the URL of the remote Git repository?", default=False)
@@ -109,7 +120,7 @@ def revision_command(project_path: Union[str, Path], cad_path: str):
 @cli.command(name="display")
 @click.option("--project-path", type=click.Path(exists=True),help="The path of the project to be revised", required=False)
 def display_command(project_path: Union[str, Path]):
-    """Update the project structure and commit the changes"""
+    """Display the CAD file as three.js html file"""
     from orion_cli.services.revision_service import RevisionService
     from pathlib import Path
     from orion_cli.helpers.config_helper import ConfigHelper

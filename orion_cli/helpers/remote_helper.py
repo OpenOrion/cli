@@ -45,7 +45,7 @@ class RemoteHelper:
         while True:
             if remote_url is not None:
                 if cls.validate_remote_url(remote_url):
-                    return remote_url
+                    return remote_url.strip()
                 else:
                     click.echo("Invalid remote repository or access denied.")
             
@@ -56,7 +56,7 @@ class RemoteHelper:
             )
             
             if choice == '1':
-                remote_url = click.prompt("Please enter a valid remote URL", type=str)
+                remote_url = str(click.prompt("Please enter a valid remote URL", type=str)).strip()
             elif choice == '2':
                 return None
             else:  # choice == '3'

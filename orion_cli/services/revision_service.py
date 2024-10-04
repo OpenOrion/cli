@@ -8,7 +8,7 @@ from orion_cli.services.cad_service import CadService, ProjectOptions
 
 class RevisionService:
     @staticmethod
-    def show_changes(self, project_path: Union[str, Path]):
+    def show_changes(project_path: Union[str, Path]):
         """Show a summary of changes in the project directory before staging"""
         from collections import defaultdict
         project_path = Path(project_path)
@@ -64,7 +64,7 @@ class RevisionService:
             logger.info(f"Error: {e}")
 
     @staticmethod
-    def revision(self, project_path: Union[str,Path], cad_path: Union[str,Path], project_options: Optional[ProjectOptions] = None):
+    def revision(project_path: Union[str,Path], cad_path: Union[str,Path], project_options: Optional[ProjectOptions] = None):
         """Update the project structure and commit the changes"""
         from orion_cli.helpers.config_helper import ConfigHelper
         from orion_cli.helpers.remote_helper import RemoteHelper
@@ -106,7 +106,7 @@ class RevisionService:
                 logger.info(f"Updated CAD file path in config.yaml to {cad_path.name}")
 
             # Show changes before staging
-            self.show_changes(project_path)
+            RevisionService.show_changes(project_path)
 
             subprocess.run(["git", "add", "."], cwd=project_path, check=True)
             logger.info("Changes staged.")

@@ -12,7 +12,6 @@ from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
 class CreateService:
     @staticmethod
     def create(
-            self, 
             name: str, 
             path: Union[str, Path], 
             cad_path: Union[str, Path], 

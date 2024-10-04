@@ -1,7 +1,7 @@
 from pathlib import Path
 import subprocess
-from typing import Optional, Union
-import click
+from typing import Union
+from orion_cli.services.log_service import logger
 
 from orion_cli.services.cad_service import CadService
 
@@ -14,4 +14,4 @@ class DisplayService:
            CadService.visualize_project(project_path, verbose=True)
 
         except Exception as e:
-            click.echo(f"An unexpected error occurred: {e}")
+            logger.info(f"An unexpected error occurred: {e}")

@@ -1,9 +1,8 @@
 from pathlib import Path
 import subprocess
 from typing import Optional, Union
-import click
+from orion_cli.services.log_service import logger
 import shutil
-
 from orion_cli.services.cad_service import CadService, ProjectOptions
 from orion_cli.helpers.config_helper import ProjectConfig, ConfigHelper
 from orion_cli.helpers.remote_helper import RemoteHelper
@@ -12,7 +11,16 @@ from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
 
 class CreateService:
     @staticmethod
-    def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None, include_assets: bool = False):
+    def create(
+            self, 
+            name: str, 
+            path: Union[str, Path], 
+            cad_path: Union[str, Path], 
+            remote_url: Optional[str] = None, 
+            include_assets: bool = False,
+            author_name: Optional[str] = None,
+            author_email: Optional[str] = None
+        ):
         """Create a new project"""
         assert RemoteHelper.ensure_git_installed(), "Git is not installed. Please install Git and try again."
         assert RemoteHelper.ensure_git_configured(), (
@@ -26,7 +34,7 @@ class CreateService:
         cad_path = Path(cad_path).resolve()
         project_options = ProjectOptions(include_assets=include_assets)
         
-        click.echo(f"Creating project '{name}' at {project_path}")
+        logger.info(f"Creating project '{name}' at {project_path}")
         project_path.mkdir(parents=True, exist_ok=True)
 
         # Copy CAD file to project directory
@@ -45,8 +53,8 @@ class CreateService:
         config_path = project_path / "config.yaml"
         ConfigHelper.save_config(config_path, project_config)
 
-        click.echo(f"Project '{name}' has been created at {project_path}")
-        click.echo(f"Configuration file created at {config_path}")
+        logger.info(f"Project '{name}' has been created at {project_path}")
+        logger.info(f"Configuration file created at {config_path}")
 
 
         # Read the content of the template .gitignore file
@@ -72,7 +80,13 @@ class CreateService:
 
         # Initialize a new Git repository
         subprocess.run(["git", "init", "--initial-branch=main"], cwd=project_path, check=True)
-        click.echo("Git repository initialized")
+        logger.info("Git repository initialized")
+        
+        if author_name:
+            subprocess.run(["git", "config", "user.name", author_name], cwd=project_path, check=True)
+            author_email = author_email or "<>"
+            subprocess.run(["git", "config", "user.email", author_email], cwd=project_path, check=True)
+            logger.info("Added author information")
 
         # Make initial commit
         subprocess.run(["git", "add", "."], cwd=project_path, check=True)

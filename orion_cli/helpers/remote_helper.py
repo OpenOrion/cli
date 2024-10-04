@@ -1,10 +1,8 @@
 import subprocess
 import click
 from typing import Optional
-
-
+from orion_cli.services.log_service import logger
 import subprocess
-import click
 from typing import Optional
 
 class RemoteHelper:
@@ -38,7 +36,7 @@ class RemoteHelper:
     @classmethod
     def get_valid_remote_url(cls, initial_url: Optional[str] = None) -> Optional[str]:
         if not cls.ensure_git_installed():
-            click.echo("Git is not installed on your machine. Please install Git to continue.")
+            logger.info("Git is not installed on your machine. Please install Git to continue.")
             raise click.Abort()
 
         remote_url = initial_url
@@ -47,7 +45,7 @@ class RemoteHelper:
                 if cls.validate_remote_url(remote_url):
                     return remote_url.strip()
                 else:
-                    click.echo("Invalid remote repository or access denied.")
+                    logger.info("Invalid remote repository or access denied.")
             
             choice = click.prompt(
                 "Do you want to (1) enter a new URL, (2) continue without a remote, or (3) abort?",
@@ -60,5 +58,5 @@ class RemoteHelper:
             elif choice == '2':
                 return None
             else:  # choice == '3'
-                click.echo("Operation aborted.")
+                logger.info("Operation aborted.")
                 raise click.Abort()

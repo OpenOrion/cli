@@ -1,6 +1,5 @@
 import subprocess
-from typing import Optional
-import click
+from orion_cli.services.log_service import logger
 from orion_cli.helpers.remote_helper import RemoteHelper
 
 class DeployService:
@@ -17,7 +16,7 @@ class DeployService:
         try:
             # Commit changes
             subprocess.check_call(["git", "commit", "-m", deploy_msg])
-            click.echo("Changes committed successfully.")
+            logger.info("Changes committed successfully.")
 
             # Set branch name to 'main'
             current_branch = "main"
@@ -27,13 +26,13 @@ class DeployService:
                 subprocess.check_call(["git", "push", "origin", current_branch])
             except subprocess.CalledProcessError:
                 # If push fails, it might be because it's the first push
-                click.echo("First push detected. Setting upstream branch...")
+                logger.info("First push detected. Setting upstream branch...")
                 subprocess.check_call(["git", "push", "-u", "origin", current_branch])
 
-            click.echo("Deployment successful!")
+            logger.info("Deployment successful!")
 
         except subprocess.CalledProcessError as e:
-            click.echo(f"An error occurred during deployment: {e}")
-            click.echo("Please check your git configuration and try again.")
+            logger.info(f"An error occurred during deployment: {e}")
+            logger.info("Please check your git configuration and try again.")
         except Exception as e:
-            click.echo(f"An unexpected error occurred: {e}")
+            logger.info(f"An unexpected error occurred: {e}")

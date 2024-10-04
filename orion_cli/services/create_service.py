@@ -2,7 +2,6 @@ from pathlib import Path
 import subprocess
 from typing import Optional, Union
 import click
-import yaml
 import shutil
 
 from orion_cli.services.cad_service import CadService, ProjectOptions
@@ -10,9 +9,9 @@ from orion_cli.helpers.config_helper import ProjectConfig, ConfigHelper
 from orion_cli.helpers.remote_helper import RemoteHelper
 from orion_cli.templates.README_template import README_TEMPLATE
 from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
-from .base_service import BaseService
 
-class CreateService(BaseService):
+class CreateService:
+    @staticmethod
     def create(self, name: str, path: Union[str, Path], cad_path: Union[str, Path], remote_url: Optional[str] = None, include_assets: bool = False):
         """Create a new project"""
         assert RemoteHelper.ensure_git_installed(), "Git is not installed. Please install Git and try again."

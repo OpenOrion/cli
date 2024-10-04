@@ -30,11 +30,29 @@ Orion CLI is a command-line interface (CLI) tool designed for managing projects 
 To install Orion CLI, you can use pip. Open your terminal and run the following command:
 
 ```bash
+# Install without Cadquery
 pip install orion-cli
+
+# Install with Cadquery
+pip install orion-cli[cq]
 ```
+
+If you'd like to install your own version of CQ checkout their [Github](https://github.com/CadQuery/cadquery) 
 
 Make sure you have Python 3.9 or higher installed before running the command. 
 
+# Dev Setup
+
+```bash
+git clone https://github.com/OpenOrion/meshql.git
+cd cli
+
+# Bash shell
+pip install .[cq,dev]
+
+# Zsh shell
+pip install .\[cq,dev\]
+```
 
 ## Usage
 

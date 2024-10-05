@@ -13,13 +13,20 @@ from OCP.BRepTools import BRepTools
 from OCP.BRep import BRep_Builder, BRep_Tool
 import cadquery as cq
 from OCP.BRepGProp import BRepGProp
-from ocp_tessellate.tessellator import Tessellator, compute_quality, cache_size, get_size
+from ocp_tessellate.tessellator import (
+    Tessellator,
+    compute_quality,
+    cache_size,
+    get_size,
+)
 from ocp_tessellate.ocp_utils import bounding_box, get_location
 import cadquery as cq
 from ocp_tessellate.stepreader import StepReader
+from orion_cli.helpers.file_helper import FileHelper
 
 RotationMatrixLike = Union[np.ndarray, list[list[float]]]
 VectorLike = Union[np.ndarray, list[float]]
+
 
 @dataclass
 class Mesh:
@@ -42,7 +49,7 @@ class CadHelper:
         tuple: A tuple of three floats representing RGB values.
         """
         return tuple([x / 255.0 if i < 3 else x for i, x in enumerate(rgb_int)])
-    
+
     @staticmethod
     def rgba_float_to_int(rgb_float: Iterable[float]):
         """
@@ -54,8 +61,10 @@ class CadHelper:
         Returns:
         tuple: A tuple of three integers representing RGB values.
         """
-        return tuple([float(int(x * 255)) if i < 3 else x for i, x in enumerate(rgb_float)])
-    
+        return tuple(
+            [float(int(x * 255)) if i < 3 else x for i, x in enumerate(rgb_float)]
+        )
+
     @staticmethod
     def vertex_to_Tuple(vertex: TopoDS_Vertex):
         geom_point = BRep_Tool.Pnt_s(vertex)
@@ -114,7 +123,7 @@ class CadHelper:
         if return_code is False:
             raise ValueError("Import failed, check file name")
         return shape
-    
+
     @staticmethod
     def import_step(file_path: Union[Path, str]) -> cq.Assembly:
         """
@@ -129,7 +138,6 @@ class CadHelper:
         r.load(str(file_path))
         return cast(cq.Assembly, r.to_cadquery())
 
-
     @staticmethod
     def import_cad(file_path: Union[Path, str]) -> cq.Assembly:
         """
@@ -137,10 +145,13 @@ class CadHelper:
         Returns a TopoDS_Shape object
         """
         file_path = Path(file_path)
-        if file_path.suffix.lower() in [".step", ".stp"]:
+
+        is_plaintext = FileHelper.is_plaintext(file_path)
+
+        if is_plaintext and file_path.suffix.lower() in [".step", ".stp"]:
             return CadHelper.import_step(file_path)
 
-        raise ValueError("Invalid file type")
+        raise ValueError("Invalid CAD file type")
 
     @staticmethod
     def export_brep(shape: TopoDS_Shape, file_path: str):
@@ -203,7 +214,7 @@ class CadHelper:
 
                 rotmat_axis_of_inertia = axis_of_inertias.dot(rotmat_axis_of_inertia)
                 curr_solid = CadHelper.transform_solid(curr_solid, axis_of_inertias)
-        
+
         rotmat = rotmat_axis_of_inertia.T
         return curr_solid, offset, rotmat
 
@@ -232,7 +243,7 @@ class CadHelper:
         # Singular Value Decomposition (SVD)
         U, S, Vt = np.linalg.svd(H)
         rotation_matrix = np.dot(Vt.T, U.T)
-        
+
         return rotation_matrix
 
     @staticmethod
@@ -241,11 +252,11 @@ class CadHelper:
         vertices2 = np.array([vertex.toTuple() for vertex in part2.Vertices()])
 
         assert len(vertices1) == len(vertices2), "solid1 and solid2 are different"
-        
+
         rotmat = CadHelper.geo_align_vertices(vertices2, vertices1)
         aligned_vertices2 = np.dot(vertices2, rotmat)
         error = np.sum(np.sum(vertices1 - aligned_vertices2, axis=0))
-        if error < 1E-3:
+        if error < 1e-3:
             return rotmat
 
         raise ValueError(f"failed to align, error: {error}")
@@ -255,7 +266,10 @@ class CadHelper:
         solid = solid if isinstance(solid, cq.Solid) else cq.Solid(solid)
 
         vertices = np.array(
-            [CadHelper.vertex_to_Tuple(TopoDS.Vertex_s(v)) for v in solid._entities("Vertex")]
+            [
+                CadHelper.vertex_to_Tuple(TopoDS.Vertex_s(v))
+                for v in solid._entities("Vertex")
+            ]
         )
 
         rounded_vertices = np.round(vertices, precision)
@@ -269,7 +283,7 @@ class CadHelper:
 
     @staticmethod
     def save_cache(cache: LRUCache, path: Union[str, Path]):
-        with open(path, 'wb') as f:
+        with open(path, "wb") as f:
             pickle.dump(cache, f)
 
     # Function to load cache from a file
@@ -277,13 +291,15 @@ class CadHelper:
     def load_cache(path: Union[str, Path]):
 
         try:
-            with open(path, 'rb') as f:
+            with open(path, "rb") as f:
                 return pickle.load(f)
         except FileNotFoundError:
             return LRUCache(maxsize=cache_size, getsizeof=get_size)
 
     @staticmethod
-    def get_viewer(cad_obj, cache_path: Union[Path, str, None] = None, remote_viewer: bool = False):
+    def get_viewer(
+        cad_obj, cache_path: Union[Path, str, None] = None, remote_viewer: bool = False
+    ):
         if remote_viewer:
             from jupyter_cadquery.viewer import show
         else:
@@ -291,20 +307,31 @@ class CadHelper:
         from jupyter_cadquery.tessellator import create_cache
 
         if cache_path and Path(cache_path).exists():
-            with open(cache_path, 'rb') as f:
+            with open(cache_path, "rb") as f:
                 cache = pickle.load(f)
         else:
             cache = create_cache()
-                # print(tess.cache)   
+            # print(tess.cache)
         viewer = show(cad_obj, cache=cache, viewer=None)
 
         if cache_path:
             CadHelper.save_cache(cache, cache_path)
         return viewer
-    
+
     @staticmethod
-    def assert_correctly_aligned(base_part: cq.Solid, aligned_part: cq.Solid, rotmat: RotationMatrixLike, offset: VectorLike):
-        recreated_original_solid = CadHelper.transform_solid(base_part, rotmat).translate(offset.tolist())
-        recreated_original_solid_checksum = CadHelper.get_part_checksum(recreated_original_solid)
+    def assert_correctly_aligned(
+        base_part: cq.Solid,
+        aligned_part: cq.Solid,
+        rotmat: RotationMatrixLike,
+        offset: VectorLike,
+    ):
+        recreated_original_solid = CadHelper.transform_solid(
+            base_part, rotmat
+        ).translate(offset.tolist())
+        recreated_original_solid_checksum = CadHelper.get_part_checksum(
+            recreated_original_solid
+        )
         original_solid_checksum = CadHelper.get_part_checksum(aligned_part)
-        assert recreated_original_solid_checksum == original_solid_checksum, f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"
+        assert (
+            recreated_original_solid_checksum == original_solid_checksum
+        ), f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"

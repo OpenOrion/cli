@@ -305,7 +305,7 @@ class CadHelper:
         else:
             from jupyter_cadquery import show
         from jupyter_cadquery.tessellator import create_cache
-
+    
         if cache_path and Path(cache_path).exists():
             with open(cache_path, "rb") as f:
                 cache = pickle.load(f)

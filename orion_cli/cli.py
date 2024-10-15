@@ -2,10 +2,9 @@ import click
 import shutil
 import pkg_resources
 from pathlib import Path
-from typing import Optional
 from typing import Optional, Union
 from orion_cli.services.log_service import logger
-from orion_cli.helpers.remote_helper import RemoteHelper
+from orion_cli.helpers.remote_helper import VersionHelper
 from orion_cli.services.archive_service import ArchiveService
 from orion_cli.services.version_service import VersionService
 
@@ -29,7 +28,7 @@ def cli():
 
 
 @cli.command(name="create")
-@click.option("--name", help="The name of the project", required=False)
+@click.option("--name", help="The name of the archive", required=False)
 @click.option(
     "--cad-path",
     help="The path for a step file (CAD/3D) to be processed with the tool",
@@ -44,28 +43,27 @@ def cli():
 )
 @click.option(
     "--include-assets",
-    help="Include assets in the project",
+    help="Include assets in the archive",
     is_flag=True,
     default=False,
 )
 def create_command(
     name: str, cad_path: str, remote_url: Optional[str], include_assets: bool
 ):
-    """Create a new project"""
-    project_path = Path.cwd()
+    """Create a new archive"""
+    archive_path = Path.cwd()
 
-    name = str(click.prompt("Please enter the project name")).strip()
+    name = str(click.prompt("Please enter the archive name")).strip()
 
-    full_project_path = project_path / name
-
-    if full_project_path.exists():
-        logger.info(f"Project '{name}' already exists at {full_project_path}")
+    full_archive_path = archive_path / name
+    if full_archive_path.exists():
+        click.echo(f"archive '{name}' already exists at {full_archive_path}")
         overwrite = click.confirm("Would you like to overwrite it?", default=False)
         if not overwrite:
-            logger.info("Exiting without creating project.")
+            click.echo("Exiting without creating archive.")
             return
-        # Remove the project directory and its contents
-        shutil.rmtree(full_project_path)
+        # Remove the archive directory and its contents
+        shutil.rmtree(full_archive_path)
 
     # Prompt the user for inputs if not provided
     if not cad_path:
@@ -83,30 +81,18 @@ def create_command(
         else:
             remote_url = click.prompt("Remote Git Repository")
 
-    if remote_url:
-        # Check if the remote repository is valid and accessible
-        valid_url = RemoteHelper.get_valid_remote_url(remote_url)
-        if valid_url is None:
-            logger.info("Continuing without a remote Git repository.")
-        else:
-            logger.info(f"Using remote repository: {valid_url}")
-        remote_url = valid_url
-
-    # Create the project
-    VersionService.create(name, project_path, cad_path, remote_url, include_assets)
-    logger.info(f"Project '{name}' has been created/updated at {project_path / name}")
-    logger.info(f"Original CAD file: {cad_path}")
-    logger.info(f"CAD file has been copied in the project directory.")
-    logger.info("Project configuration has been created and saved.")
-
-    logger.info("Project creation/update completed successfully.")
+    # Create the archive
+    VersionService.initialize_archive(
+        name, archive_path, cad_path, remote_url, include_assets
+    )
+    click.echo(f"archive '{name}' has been initialized at {archive_path / name}")
 
 
 @cli.command(name="revision")
 @click.option(
-    "--project_path",
+    "--archive_path",
     type=click.Path(exists=True),
-    help="The path of the project to be revised",
+    help="The path of the archive to be revised",
     required=False,
 )
 @click.option(
@@ -115,17 +101,17 @@ def create_command(
     help="The path for a step file (CAD/3D) to be processed with the tool",
     required=False,
 )
-def revision_command(project_path: Union[str, Path], cad_path: str):
-    """Update the project structure and commit the changes"""
-    project_path = Path.cwd() if not project_path else Path(project_path)
-    VersionService.revision(project_path, cad_path)
+def revision_command(archive_path: Union[str, Path], cad_path: str):
+    """Update the archive structure and commit the changes"""
+    archive_path = Path.cwd() if not archive_path else Path(archive_path)
+    VersionService.revise_repo(archive_path, cad_path)
 
 
 @cli.command(name="display")
 @click.option(
-    "--project-path",
+    "--archive-path",
     type=click.Path(exists=True),
-    help="The path of the project to be revised",
+    help="The path of the archive to be revised",
     required=False,
 )
 def display_command(archive_path: Union[str, Path]):
@@ -135,11 +121,11 @@ def display_command(archive_path: Union[str, Path]):
 
 
 @cli.command(name="deploy")
-@click.option("--deploy-msg", help="Project deployment message", required=False)
+@click.option("--deploy-msg", help="archive deployment message", required=False)
 def deploy_command(deploy_msg: Optional[str | None] = None):
-    """Deploy the project to the remote repository"""
+    """Deploy the archive to the remote repository"""
 
-    """Deploy the project to the remote repository"""
+    """Deploy the archive to the remote repository"""
     if not deploy_msg:
         deploy_msg = click.prompt("Please enter a deployment message")
 

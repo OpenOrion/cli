@@ -46,45 +46,45 @@ class DiffPatch:
 class DiffService:
     @staticmethod
     def apply_assembly_diff(
-        project: CadArchive,
-        diff: Union[AssemblyModification, PartModification],
+        archive: CadArchive,
+        diff: Union[AssemblyModification, PartModification, DeleteType],
         assembly_id: Assembly,
     ):
         is_assembly = isinstance(diff, AssemblyModification)
         child = (
-            project.assemblies[assembly_id]
+            archive.assemblies[assembly_id]
             if is_assembly
-            else project.parts[assembly_id]
+            else archive.part_refs[assembly_id]
         )
 
         new_parent_path = "/".join(diff.path.split("/")[:-1]) or "/"
         new_child_name = diff.path.split("/")[-1]
-        new_parent_assembly = project.get_assembly_by_path(new_parent_path)
+        new_parent_assembly = archive.get_by_path(new_parent_path)
 
-        if diff.delete:
+        if diff == "delete":
             if is_assembly:
-                new_parent_assembly.remove_child(assembly_id, project)
+                new_parent_assembly.remove_child(assembly_id, archive)
             else:
-                new_parent_assembly.remove_part_ref(assembly_id, project)
+                new_parent_assembly.remove_part_ref(assembly_id, archive)
             return
+        else:
+            if diff.location:
+                if diff.location.position:
+                    child.location.position = np.array(diff.location.position)
+                if diff.location.rotation:
+                    child.location.rotation = np.array(diff.location.rotation)
 
-        if diff.location:
-            if diff.location.position:
-                child.location.position = np.array(diff.location.position)
-            if diff.location.rotation:
-                child.location.rotation = np.array(diff.location.rotation)
+            if diff.path:
+                # remove assembly from previous parent
+                parent_assembly = archive.get_by_path(child.parent_path)
 
-        if diff.path:
-            # remove assembly from previous parent
-            parent_assembly = project.get_assembly_by_path(child.parent_path)
-
-            # remove from old parent and add to new parent
-            if is_assembly:
-                parent_assembly.remove_child(assembly_id, project)
-                new_parent_assembly.add_child(child, project, new_child_name)
-            else:
-                parent_assembly.remove_part_ref(assembly_id, project)
-                new_parent_assembly.add_part_ref(child, project, new_child_name)
+                # remove from old parent and add to new parent
+                if is_assembly:
+                    parent_assembly.remove_child(assembly_id, archive)
+                    new_parent_assembly.add_child(child, archive, new_child_name)
+                else:
+                    parent_assembly.remove_part_ref(assembly_id, archive)
+                    new_parent_assembly.add_part_ref(child, archive, new_child_name)
 
     @staticmethod
     def apply_patch(project: CadArchive, patch: DiffPatch):

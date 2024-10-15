@@ -14,9 +14,6 @@ from orion_cli.models.archive import (
     InventoryVariationRef,
     Location,
     PartRef,
-    AssemblyPath,
-    AssemblyId,
-    PartChecksum,
 )
 from orion_cli.helpers.cad_helper import CadHelper
 
@@ -30,23 +27,26 @@ class ArchiveHelper:
         curr_abs_location: Optional[Location] = None,
         curr_path: str = "",
     ):
+        # initialize archive and index if not provided
         if archive is None:
             archive = CadArchive()
         if index is None:
             index = AssemblyIndex()
-        if curr_path == "":
-            index.is_assembly_modified.clear()
-            index.is_part_modified.clear()
 
+        # convert location to absolute location
         rel_location = Location.convert(cq_assembly.loc)
+        abs_location = rel_location.transform(curr_abs_location)
+
         root_assembly = Assembly(
             path=curr_path + f"/{cq_assembly.name}",
             location=rel_location if not rel_location.is_zero else None,
         )
-        abs_location = rel_location.transform(curr_abs_location)
-
         assemblies = [root_assembly]
-        archive.assemblies[root_assembly.id] = root_assembly
+
+        if curr_path == "":
+            index.is_assembly_modified.clear()
+            index.is_part_modified.clear()
+            archive.add_assembly(root_assembly)
 
         is_modified = False
         for cq_subassembly in cq_assembly.children:
@@ -71,7 +71,7 @@ class ArchiveHelper:
                     abs_location,
                     archive.inventory,
                     index,
-                    archive.config.options,
+                    archive.config,
                 )
 
                 is_modified = not (
@@ -117,8 +117,8 @@ class ArchiveHelper:
             if cq_assembly.color
             else None
         )
-        existing_variation = ArchiveHelper.get_variation_from_color(
-            archive.inventory, part_ref.variation.checksum, part_color
+        existing_variation = archive.inventory.get_variation_from_color(
+            part_ref.variation.checksum, part_color
         )
 
         if part_checksum not in archive.inventory.catalog.items:
@@ -143,8 +143,7 @@ class ArchiveHelper:
 
         # keep the metadata from the previous archive
         if index and index.prev_archive:
-            prev_variation = ArchiveHelper.get_variation_from_color(
-                index.prev_archive.inventory,
+            prev_variation = index.prev_archive.inventory.get_variation_from_color(
                 part_ref.variation.checksum,
                 part_color,
             )
@@ -330,45 +329,3 @@ class ArchiveHelper:
             index.aligned_refs[aligned_checksum] = part_ref
 
         return base_part, part_ref
-
-    def update_paths(
-        archive: CadArchive,
-        parent_path: AssemblyPath,
-        children: list[AssemblyId],
-        is_assembly: bool = True,
-    ):
-        for child_id in children:
-            child = (
-                archive.assemblies.get(child_id)
-                if is_assembly
-                else archive.part_refs.get(child_id)
-            )
-            if child:
-                child.path = f"{parent_path}/{child.name}"
-                archive.update_paths(child.path, child.children)
-
-    def get_variation(inventory: Inventory, ref: InventoryVariationRef):
-        return inventory.catalog.items[ref.checksum].variations[ref.id - 1]
-
-    def get_variation_from_color(
-        inventory: Inventory,
-        part_checksum: PartChecksum,
-        part_color: Optional[list[float]] = None,
-    ):
-        if part_checksum in inventory.catalog.items:
-            for variation in inventory.catalog.items[part_checksum].variations:
-                if variation.color == part_color:
-                    return variation
-
-    def find_variation_id(
-        inventory: Inventory,
-        part_checksum: PartChecksum,
-        part_color: Optional[list[float]] = None,
-    ):
-        variation = ArchiveHelper.get_variation_from_color(part_checksum, part_color)
-        if variation:
-            return variation.id
-        elif part_checksum in inventory.catalog.items:
-            return len(inventory.catalog.items[part_checksum].variations) + 1
-        else:
-            return 1

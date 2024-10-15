@@ -13,6 +13,7 @@ from OCP.BRepGProp import BRepGProp
 import cadquery as cq
 from ocp_tessellate.stepreader import StepReader
 from orion_cli.helpers.file_helper import FileHelper
+from jupyter_cadquery.tessellator import save_cache
 
 RotationMatrixLike = Union[np.ndarray, list[list[float]]]
 VectorLike = Union[np.ndarray, list[float]]
@@ -77,7 +78,7 @@ class CadHelper:
         return_code = BRepTools.Read_s(shape, str(file_path), builder)
         if return_code is False:
             raise ValueError("Import failed, check file name")
-        return shape
+        return cq.Solid(shape)
 
     @staticmethod
     def import_step(file_path: Union[Path, str]) -> cq.Assembly:
@@ -121,7 +122,6 @@ class CadHelper:
         rotmat_axis_of_inertia = np.eye(3)
 
         if norm_axis:
-            has_symetric_axis = False
             for axis_index in range(2):
                 axis_vector = np.zeros(3)
                 axis_vector[axis_index] = 1
@@ -130,7 +130,6 @@ class CadHelper:
                 BRepGProp.VolumeProperties_s(curr_solid.wrapped, Properties)
                 principle_properties = Properties.PrincipalProperties()
 
-                has_symetric_axis = principle_properties.HasSymmetryAxis()
                 axis_of_inertias_occ = (
                     principle_properties.FirstAxisOfInertia(),
                     principle_properties.SecondAxisOfInertia(),
@@ -174,7 +173,7 @@ class CadHelper:
         return curr_solid, offset, rotmat
 
     @staticmethod
-    def geo_align_vertices(vertices1, vertices2):
+    def align_vertices(vertices1, vertices2):
         """
         Align vertices2 to vertices1 using Procrustes analysis.
 
@@ -208,13 +207,14 @@ class CadHelper:
 
         assert len(vertices1) == len(vertices2), "solid1 and solid2 are different"
 
-        rotmat = CadHelper.geo_align_vertices(vertices2, vertices1)
+        rotmat = CadHelper.align_vertices(vertices2, vertices1)
         aligned_vertices2 = np.dot(vertices2, rotmat)
         error = np.sum(np.sum(vertices1 - aligned_vertices2, axis=0))
         if error < 1e-3:
             return rotmat
 
         raise ValueError(f"failed to align, error: {error}")
+
 
     @staticmethod
     def get_part_checksum(solid: Union[cq.Solid, TopoDS_Solid], precision=3):
@@ -255,7 +255,7 @@ class CadHelper:
         viewer = show(cad_obj, cache=cache, viewer=None)
 
         if cache_path:
-            CadHelper.save_cache(cache, cache_path)
+            save_cache(cache, cache_path)
         return viewer
 
     @staticmethod

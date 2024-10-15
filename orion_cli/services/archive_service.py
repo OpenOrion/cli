@@ -247,12 +247,12 @@ class ArchiveService:
     @staticmethod
     def read_archive(archive_path: Union[Path, str]):
         archive = CadArchive()
+        archive_path = Path(archive_path)
 
         config_path = archive_path / "config.yaml"
         with open(config_path, "r") as f:
             archive.config = ArchiveConfig.model_validate(yaml.safe_load(f))
 
-        archive_path = Path(archive_path)
         assert archive_path.is_dir(), f"archive directory not found: {archive_path}"
         inventory_path = archive_path / INVENTORY_DIRECTORY
         parts_path = inventory_path / "parts"

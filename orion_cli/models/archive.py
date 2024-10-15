@@ -1,8 +1,7 @@
 # Parameter Labels
-from dataclasses import Field
 from typing import Any, Optional, OrderedDict, Union
 import uuid
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 import cadquery as cq
 from orion_cli.helpers.cad_helper import CadHelper
 from orion_cli.utils.numpy import NdArray
@@ -20,7 +19,6 @@ AssemblyId = str
 
 
 class ArchiveConfig(BaseModel):
-    name: str
     max_name_depth: int = 3
     normalize_axis: bool = False
     use_part_references: bool = True
@@ -72,11 +70,53 @@ class Inventory(BaseModel):
             catalog=self.catalog.model_copy(update=update, deep=deep),
         )
 
+    def get_variation(self, ref: InventoryVariationRef):
+        return self.catalog.items[ref.checksum].variations[ref.id - 1]
+
+    def get_variation_from_color(
+        self,
+        part_checksum: PartChecksum,
+        part_color: Optional[list[float]] = None,
+    ):
+        if part_checksum in self.catalog.items:
+            for variation in self.catalog.items[part_checksum].variations:
+                if variation.color == part_color:
+                    return variation
+
+    def find_variation_id(
+        self, part_checksum: PartChecksum, part_color: Optional[list[float]] = None
+    ):
+        variation = self.get_variation_from_color(part_checksum, part_color)
+        if variation:
+            return variation.id
+        elif part_checksum in self.catalog.items:
+            return len(self.catalog.items[part_checksum].variations) + 1
+        else:
+            return 1
+
 
 class Location(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     position: NdArray
     orientation: NdArray
+
+    def to_cq(self):
+        transformation = gp_Trsf()
+        transformation.SetValues(
+            self.orientation[0][0],
+            self.orientation[0][1],
+            self.orientation[0][2],
+            self.position[0],
+            self.orientation[1][0],
+            self.orientation[1][1],
+            self.orientation[1][2],
+            self.position[1],
+            self.orientation[2][0],
+            self.orientation[2][1],
+            self.orientation[2][2],
+            self.position[2],
+        )
+        return cq.Location(transformation)
 
     @property
     def is_zero(self):
@@ -85,13 +125,13 @@ class Location(BaseModel):
     def transform(self, location: Union["Location", cq.Location, None]):
         if location is None:
             return self.model_copy()
-
+        
         if isinstance(location, cq.Location):
             location = Location.convert(location)
 
         return Location(
             position=self.position + location.position,
-            orientation=self.orientation.dot(location.orientation),
+            orientation=self.orientation.dot(location.orientation)
         )
 
     @staticmethod
@@ -102,35 +142,17 @@ class Location(BaseModel):
             return loc
 
         transformation = loc.wrapped.Transformation()
-        translation = np.array(
-            [
-                transformation.Value(1, 4),
-                transformation.Value(2, 4),
-                transformation.Value(3, 4),
-            ]
-        )
-        rotmat = np.array(
-            [
-                [
-                    transformation.Value(1, 1),
-                    transformation.Value(1, 2),
-                    transformation.Value(1, 3),
-                ],
-                [
-                    transformation.Value(2, 1),
-                    transformation.Value(2, 2),
-                    transformation.Value(2, 3),
-                ],
-                [
-                    transformation.Value(3, 1),
-                    transformation.Value(3, 2),
-                    transformation.Value(3, 3),
-                ],
-            ]
-        )
+        translation = np.array([transformation.Value(1, 4), transformation.Value(2, 4), transformation.Value(3, 4)])
+        rotmat = np.array([
+            [transformation.Value(1, 1), transformation.Value(1, 2), transformation.Value(1, 3)],
+            [transformation.Value(2, 1), transformation.Value(2, 2), transformation.Value(2, 3)],
+            [transformation.Value(3, 1), transformation.Value(3, 2), transformation.Value(3, 3)],
+        ])
 
-        return Location(position=translation, orientation=rotmat)
-
+        return Location(
+            position=translation,
+            orientation=rotmat
+        )
 
 class PartRef(BaseModel):
     """
@@ -148,6 +170,7 @@ class Assembly(BaseModel):
     """
     Assembly of parts and subassemblies as references
     """
+
     path: Optional[AssemblyPath] = Field(default=None, exclude=True)
     id: AssemblyId = Field(default_factory=lambda: str(uuid.uuid4()))
     location: Optional[Location] = None
@@ -173,13 +196,13 @@ class Assembly(BaseModel):
     def remove_child(self, child_id: AssemblyId, archive: "CadArchive"):
         assert child_id in self.children, "Child not found"
         self.children.remove(child_id)
-        del archive.assemblies[child_id]
+        archive.remove_assembly(child_id)
 
     def remove_part_ref(self, part_ref_id: AssemblyId, archive: "CadArchive"):
+        archive.remove_part_ref(part_ref_id)
         for i, part_ref in enumerate(self.parts):
             if part_ref.id == part_ref_id:
                 del self.parts[i]
-                del archive.part_refs[part_ref_id]
                 break
 
     def add_child(
@@ -194,8 +217,8 @@ class Assembly(BaseModel):
             raise ValueError("Invalid new name")
         assert child.id not in self.children, "Child already exists"
         self.children.append(child.id)
-        archive.assemblies[child.id] = child
-        archive.paths[child.path] = child
+        archive.add_assembly(child)
+        # archive.update_paths(self.path, child.children, is_assembly=True)
 
     def add_part_ref(
         self,
@@ -208,8 +231,8 @@ class Assembly(BaseModel):
         if not child_name:
             raise ValueError("Invalid new name")
         self.parts.append(part_ref)
-        archive.part_refs[part_ref.id] = part_ref
-        archive.paths[part_ref.path] = part_ref
+        archive.add_part_ref(part_ref)
+
 
     def to_cq(
         self,
@@ -251,12 +274,6 @@ class Assembly(BaseModel):
 
         return cq_assembly
 
-    @staticmethod
-    def get_by_path(archive: "CadArchive", path: AssemblyPath):
-        assert path and path in archive.paths, f"Assembly not found: {path}"
-        assembly = archive.paths[path]
-        assert isinstance(assembly, Assembly), f"Not an Assembly: {path}"
-        return assembly
 
 
 class CadArchive(BaseModel):
@@ -267,6 +284,23 @@ class CadArchive(BaseModel):
     paths: OrderedDict[AssemblyPath, Union[Assembly, PartRef]] = Field(
         default_factory=OrderedDict
     )
+
+    def add_assembly(self, assembly: Assembly):
+        self.assemblies[assembly.id] = assembly
+        self.paths[assembly.path] = assembly
+
+    def add_part_ref(self, part_ref: PartRef):
+        self.part_refs[part_ref.id] = part_ref
+        self.paths[part_ref.path] = part_ref
+
+    def remove_assembly(self, assembly_id: AssemblyId):
+        assert assembly_id in self.assemblies, "Assembly not found"
+        del self.assemblies[assembly_id]
+
+    def remove_part_ref(self, part_ref_id: AssemblyId):
+        assert part_ref_id in self.part_refs, "Part not found"
+        del self.part_refs[part_ref_id]
+
 
     @property
     def root_assembly(self):
@@ -289,6 +323,32 @@ class CadArchive(BaseModel):
             config=self.config.model_copy(update=update, deep=deep),
             paths=paths,
         )
+
+    # TODO: make sure this is correct
+    def update_paths(
+        self,
+        parent_path: AssemblyPath,
+        children: list[AssemblyId],
+        is_assembly: bool = True,
+    ):
+        for child_id in children:
+            child = (
+                self.assemblies.get(child_id)
+                if is_assembly
+                else self.part_refs.get(child_id)
+            )
+            if child:
+                child.path = f"{parent_path}/{child.name}"
+                self.paths[child.path] = child
+                self.update_paths(child.path, child.children)
+
+
+    def get_by_path(self, path: AssemblyPath):
+        assert path and path in self.paths, f"Assembly not found: {path}"
+        assembly = self.paths[path]
+        assert isinstance(assembly, Assembly), f"Not an Assembly: {path}"
+        return assembly
+
 
 
 class AssemblyIndex(BaseModel):

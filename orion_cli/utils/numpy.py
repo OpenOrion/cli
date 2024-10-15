@@ -1,6 +1,6 @@
-from typing import Annotated, Optional, Union
+from typing import Annotated
 import numpy as np
-from pydantic import BeforeValidator, ConfigDict, PlainSerializer
+from pydantic import BeforeValidator, PlainSerializer
 
 
 NdArray = Annotated[

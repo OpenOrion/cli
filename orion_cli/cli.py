@@ -1,14 +1,13 @@
 import click
 import shutil
-import subprocess
 import pkg_resources
 from pathlib import Path
 from typing import Optional
 from typing import Optional, Union
 from orion_cli.services.log_service import logger
-from orion_cli.helpers.config_helper import ConfigHelper
 from orion_cli.helpers.remote_helper import RemoteHelper
-from orion_cli.services.project_service import ProjectService
+from orion_cli.services.archive_service import ArchiveService
+from orion_cli.services.version_service import VersionService
 
 
 version = pkg_resources.get_distribution("orion_cli").version
@@ -94,7 +93,7 @@ def create_command(
         remote_url = valid_url
 
     # Create the project
-    ProjectService.create(name, project_path, cad_path, remote_url, include_assets)
+    VersionService.create(name, project_path, cad_path, remote_url, include_assets)
     logger.info(f"Project '{name}' has been created/updated at {project_path / name}")
     logger.info(f"Original CAD file: {cad_path}")
     logger.info(f"CAD file has been copied in the project directory.")
@@ -119,25 +118,7 @@ def create_command(
 def revision_command(project_path: Union[str, Path], cad_path: str):
     """Update the project structure and commit the changes"""
     project_path = Path.cwd() if not project_path else Path(project_path)
-    config_path = project_path / "config.yaml"
-    if not config_path.exists():
-        logger.info("No config.yaml found in the project directory.")
-        logger.info(
-            "You can create a project using 'orion create' or provide a valid project path."
-        )
-        return
-
-    # Load the configuration
-    config = ConfigHelper.load_config(config_path)
-
-    # Use the cad_path from the config if not provided as an argument
-    if not cad_path:
-        if not config.cad_path or not Path(config.cad_path).is_file():
-            logger.info("Invalid CAD path provided in config.")
-            return
-        cad_path = config.cad_path
-
-    ProjectService.revision(project_path, cad_path, config.options)
+    VersionService.revision(project_path, cad_path)
 
 
 @cli.command(name="display")
@@ -147,19 +128,10 @@ def revision_command(project_path: Union[str, Path], cad_path: str):
     help="The path of the project to be revised",
     required=False,
 )
-def display_command(project_path: Union[str, Path]):
+def display_command(archive_path: Union[str, Path]):
     """Display the CAD file as three.js html file"""
-
-    project_path = Path.cwd() if not project_path else Path(project_path)
-    config_path = project_path / "config.yaml"
-    if not config_path.exists():
-        logger.info("No config.yaml found in the project directory.")
-        logger.info(
-            "You can create a project using 'orion create' or provide a valid project path."
-        )
-        return
-
-    ProjectService.display(project_path)
+    archive_path = Path.cwd() if not archive_path else Path(archive_path)
+    ArchiveService.visualize_archive(archive_path)
 
 
 @cli.command(name="deploy")
@@ -168,102 +140,11 @@ def deploy_command(deploy_msg: Optional[str | None] = None):
     """Deploy the project to the remote repository"""
 
     """Deploy the project to the remote repository"""
-    project_path = Path.cwd()
-    config_path = project_path / "config.yaml"
-
-    if not config_path.exists():
-        logger.info("No config.yaml found in the project directory.")
-        logger.info(
-            "You can create a project using 'orion create' or provide a valid project path."
-        )
-        return
-
-    # Load the configuration
-    config = ConfigHelper.load_config(config_path)
-    if not config.repo_url:
-        logger.info("No remote repository URL found in the project config.yaml.")
-        logger.info("Please update the config.yaml file with the remote repository URL.")
-        return
-
-    # 1 & 2. Check and update remote URL if necessary
-    try:
-        current_remote = subprocess.check_output(
-            ["git", "config", "--get", "remote.origin.url"],
-            universal_newlines=True,
-            stderr=subprocess.DEVNULL,
-        ).strip()
-    except subprocess.CalledProcessError:
-        current_remote = None
-
-    if current_remote != config.repo_url:
-        logger.info(f"Updating the remote URL to {config.repo_url}...")
-        try:
-            if current_remote:
-                subprocess.check_call(
-                    ["git", "remote", "set-url", "origin", config.repo_url]
-                )
-            else:
-                subprocess.check_call(
-                    ["git", "remote", "add", "origin", config.repo_url]
-                )
-        except subprocess.CalledProcessError:
-            logger.info(
-                "Failed to update the remote URL. Please check your config.yaml and try again."
-            )
-            return
-
-    # 3. Validate the remote URL
-    if not RemoteHelper.validate_remote_url(config.repo_url):
-        logger.info("The remote URL in config.yaml is not valid or not accessible.")
-        logger.info(
-            "Please update your config.yaml with a valid remote URL and try again."
-        )
-        return
-
-    # 4. Set up tracking for the current branch
-    try:
-        current_branch = subprocess.check_output(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], universal_newlines=True
-        ).strip()
-
-        # Check if the remote branch exists
-        remote_branches = subprocess.check_output(
-            ["git", "ls-remote", "--heads", "origin", current_branch],
-            universal_newlines=True,
-        ).strip()
-
-        if remote_branches:
-            # Remote branch exists, set up tracking
-            subprocess.check_call(
-                [
-                    "git",
-                    "branch",
-                    "--set-upstream-to",
-                    f"origin/{current_branch}",
-                    current_branch,
-                ]
-            )
-            logger.info(
-                f"Tracking set up for branch '{current_branch}' with 'origin/{current_branch}'"
-            )
-        else:
-            # Remote branch doesn't exist, prepare to push
-            logger.info(
-                f"Remote branch 'origin/{current_branch}' doesn't exist. It will be created on first push."
-            )
-
-        logger.info("Remote URL validated and branch tracking configured successfully.")
-    except subprocess.CalledProcessError as e:
-        logger.info(f"An error occurred while setting up branch tracking: {e}")
-        logger.info(
-            "Continuing with deployment, but you may need to push with '-u' flag on first push."
-        )
-
     if not deploy_msg:
         deploy_msg = click.prompt("Please enter a deployment message")
 
     # Proceed with deployment
-    ProjectService.deploy(deploy_msg or "")
+    VersionService.deploy(deploy_msg or "")
 
 
 if __name__ == "__main__":

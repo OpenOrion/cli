@@ -1,40 +1,21 @@
-from dataclasses import dataclass
 import hashlib
 from pathlib import Path
 import pickle
 from typing import Iterable, Optional, Union, cast
-from cachetools import LRUCache
 import numpy as np
 from OCP.GProp import GProp_GProps
 from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS, TopoDS_Solid
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
-from OCP.gp import gp_Trsf
 from OCP.BRepTools import BRepTools
 from OCP.BRep import BRep_Builder, BRep_Tool
 import cadquery as cq
 from OCP.BRepGProp import BRepGProp
-from ocp_tessellate.tessellator import (
-    Tessellator,
-    compute_quality,
-    cache_size,
-    get_size,
-)
-from ocp_tessellate.ocp_utils import bounding_box, get_location
 import cadquery as cq
 from ocp_tessellate.stepreader import StepReader
 from orion_cli.helpers.file_helper import FileHelper
 
 RotationMatrixLike = Union[np.ndarray, list[list[float]]]
 VectorLike = Union[np.ndarray, list[float]]
-
-
-@dataclass
-class Mesh:
-    vertices: np.ndarray
-    simplices: np.ndarray
-    normals: np.ndarray
-    edges: np.ndarray
-
 
 class CadHelper:
     @staticmethod
@@ -69,32 +50,6 @@ class CadHelper:
     def vertex_to_Tuple(vertex: TopoDS_Vertex):
         geom_point = BRep_Tool.Pnt_s(vertex)
         return (geom_point.X(), geom_point.Y(), geom_point.Z())
-
-    @staticmethod
-    def tesselate_shape(shape: cq.Solid):
-        tess = Tessellator("")
-
-        bb = bounding_box(shape.wrapped, loc=get_location(None), optimal=False)
-        quality = compute_quality(bb, deviation=0.1)
-
-        tess.compute(
-            shape.wrapped,
-            quality,
-            angular_tolerance=0.2,
-            compute_faces=True,
-            compute_edges=True,
-            debug=False,
-        )
-        tri_vertices = tess.get_vertices().reshape(-1, 3)
-        tri_indices = tess.get_triangles().reshape(-1, 3)
-        tri_normals = tess.get_normals().reshape(-1, 3)
-        edges = tess.get_edges().reshape(-1, 2, 3)
-        return Mesh(
-            vertices=tri_vertices,
-            simplices=tri_indices,
-            normals=tri_normals,
-            edges=edges,
-        )
 
     @staticmethod
     def transform_solid(
@@ -282,21 +237,6 @@ class CadHelper:
         return hashlib.md5(vertices_hash).hexdigest()
 
     @staticmethod
-    def save_cache(cache: LRUCache, path: Union[str, Path]):
-        with open(path, "wb") as f:
-            pickle.dump(cache, f)
-
-    # Function to load cache from a file
-    @staticmethod
-    def load_cache(path: Union[str, Path]):
-
-        try:
-            with open(path, "rb") as f:
-                return pickle.load(f)
-        except FileNotFoundError:
-            return LRUCache(maxsize=cache_size, getsizeof=get_size)
-
-    @staticmethod
     def get_viewer(
         cad_obj, cache_path: Union[Path, str, None] = None, remote_viewer: bool = False
     ):
@@ -335,3 +275,5 @@ class CadHelper:
         assert (
             recreated_original_solid_checksum == original_solid_checksum
         ), f"recreated_original_solid_checksum: {recreated_original_solid_checksum} != original_solid_checksum: {original_solid_checksum}"
+
+

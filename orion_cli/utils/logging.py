@@ -1,4 +1,3 @@
-# %%
 import logging
 
 def setup_logger(verbose=True):
@@ -21,4 +20,3 @@ def setup_logger(verbose=True):
 
 # Usage example
 logger = setup_logger()
-# %%

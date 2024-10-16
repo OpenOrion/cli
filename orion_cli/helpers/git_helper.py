@@ -129,7 +129,7 @@ class GitHelper:
                 logger.info(f"Remote 'origin' added with URL: {remote_url}")
 
             # Stage all files for the initial commit
-            repo.git.add(A=True)  # Equivalent to 'git add .'
+            GitHelper.stage_repo(archive_path)
             logger.info("Staged all files for initial commit.")
 
         except GitCommandError as e:

@@ -238,8 +238,8 @@ class ArchiveService:
 
         if write:
             ArchiveService.write_archive(archive_path, revised_archive, verbose=verbose)
-            # if include_git:
-            #     GitHelper.stage_repo(archive_path)
+            if include_git:
+                GitHelper.stage_repo(archive_path)
 
         return revised_archive
 

@@ -125,13 +125,13 @@ class Location(BaseModel):
     def transform(self, location: Union["Location", cq.Location, None]):
         if location is None:
             return self.model_copy()
-        
+
         if isinstance(location, cq.Location):
             location = Location.convert(location)
 
         return Location(
             position=self.position + location.position,
-            orientation=self.orientation.dot(location.orientation)
+            orientation=self.orientation.dot(location.orientation),
         )
 
     @staticmethod
@@ -142,17 +142,35 @@ class Location(BaseModel):
             return loc
 
         transformation = loc.wrapped.Transformation()
-        translation = np.array([transformation.Value(1, 4), transformation.Value(2, 4), transformation.Value(3, 4)])
-        rotmat = np.array([
-            [transformation.Value(1, 1), transformation.Value(1, 2), transformation.Value(1, 3)],
-            [transformation.Value(2, 1), transformation.Value(2, 2), transformation.Value(2, 3)],
-            [transformation.Value(3, 1), transformation.Value(3, 2), transformation.Value(3, 3)],
-        ])
-
-        return Location(
-            position=translation,
-            orientation=rotmat
+        translation = np.array(
+            [
+                transformation.Value(1, 4),
+                transformation.Value(2, 4),
+                transformation.Value(3, 4),
+            ]
         )
+        rotmat = np.array(
+            [
+                [
+                    transformation.Value(1, 1),
+                    transformation.Value(1, 2),
+                    transformation.Value(1, 3),
+                ],
+                [
+                    transformation.Value(2, 1),
+                    transformation.Value(2, 2),
+                    transformation.Value(2, 3),
+                ],
+                [
+                    transformation.Value(3, 1),
+                    transformation.Value(3, 2),
+                    transformation.Value(3, 3),
+                ],
+            ]
+        )
+
+        return Location(position=translation, orientation=rotmat)
+
 
 class PartRef(BaseModel):
     """
@@ -233,7 +251,6 @@ class Assembly(BaseModel):
         self.parts.append(part_ref)
         archive.add_part_ref(part_ref)
 
-
     def to_cq(
         self,
         archive: "CadArchive",
@@ -275,6 +292,24 @@ class Assembly(BaseModel):
         return cq_assembly
 
 
+class ArchiveIndex(BaseModel):
+    """
+    Index is for caching operations and revisioning for changes to the assembly
+    """
+
+    # caching
+    base_parts: dict[PartGroup, cq.Solid] = Field(default_factory=dict)
+    aligned_refs: dict[AlignedPartChecksum, PartRef] = Field(default_factory=dict)
+    part_names: dict[PartName, Optional[PartRef]] = Field(default_factory=dict)
+    part_colors: dict[PartChecksum, set[tuple[float]]] = Field(default_factory=dict)
+
+    # revisioning
+    prev_archive: Optional["CadArchive"] = None
+    is_part_modified: set[InventoryVariationRef] = Field(default_factory=set)
+    is_assembly_modified: set[AssemblyId] = Field(default_factory=set)
+
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+
 
 class CadArchive(BaseModel):
     assemblies: OrderedDict[AssemblyId, Assembly] = Field(default_factory=OrderedDict)
@@ -284,6 +319,7 @@ class CadArchive(BaseModel):
     paths: OrderedDict[AssemblyPath, Union[Assembly, PartRef]] = Field(
         default_factory=OrderedDict
     )
+    index: ArchiveIndex = Field(default_factory=ArchiveIndex, exclude=True)
 
     def add_assembly(self, assembly: Assembly):
         self.assemblies[assembly.id] = assembly
@@ -300,7 +336,6 @@ class CadArchive(BaseModel):
     def remove_part_ref(self, part_ref_id: AssemblyId):
         assert part_ref_id in self.part_refs, "Part not found"
         del self.part_refs[part_ref_id]
-
 
     @property
     def root_assembly(self):
@@ -342,29 +377,8 @@ class CadArchive(BaseModel):
                 self.paths[child.path] = child
                 self.update_paths(child.path, child.children)
 
-
     def get_by_path(self, path: AssemblyPath):
         assert path and path in self.paths, f"Assembly not found: {path}"
         assembly = self.paths[path]
         assert isinstance(assembly, Assembly), f"Not an Assembly: {path}"
         return assembly
-
-
-
-class AssemblyIndex(BaseModel):
-    """
-    Index is for caching operations and revisioning for changes to the assembly
-    """
-
-    # caching
-    base_parts: dict[PartGroup, cq.Solid] = Field(default_factory=dict)
-    aligned_refs: dict[AlignedPartChecksum, PartRef] = Field(default_factory=dict)
-    part_names: dict[PartName, Optional[PartRef]] = Field(default_factory=dict)
-    part_colors: dict[PartChecksum, set[tuple[float]]] = Field(default_factory=dict)
-
-    # revisioning
-    prev_archive: Optional["CadArchive"] = None
-    is_part_modified: set[InventoryVariationRef] = Field(default_factory=set)
-    is_assembly_modified: set[AssemblyId] = Field(default_factory=set)
-
-    model_config = ConfigDict(arbitrary_types_allowed=True)

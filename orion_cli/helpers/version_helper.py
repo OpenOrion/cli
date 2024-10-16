@@ -5,6 +5,7 @@ from orion_cli.utils.logging import logger
 import git
 from git import Repo, GitCommandError, InvalidGitRepositoryError
 
+
 class VersionHelper:
     @staticmethod
     def get_remote_url() -> Optional[str]:
@@ -15,16 +16,17 @@ class VersionHelper:
         except (InvalidGitRepositoryError, AttributeError):
             logger.info("No remote URL found.")
             return None
-
+    
     @staticmethod
-    def validate_remote_url(remote_url: str) -> bool:
+    def assety_valid_remote_url(remote_url: str) -> None:
         try:
             repo = Repo(".")
             # Using ls-remote to check if the URL is valid and accessible
             repo.git.ls_remote(remote_url)
-            return True
         except GitCommandError:
-            return False
+            raise AssertionError(f"Remote URL {remote_url} is not valid or accessible.")
+
+
 
     @staticmethod
     def assert_git_installed() -> bool:
@@ -51,10 +53,11 @@ class VersionHelper:
             raise AssertionError("Git repository not found or Git command failed.")
 
     @staticmethod
-    def push(branch_name: str = "main") -> None:
+    def push_repo(archive_path:Union[str, Path], branch_name: str = "main") -> None:
         """Pushes the branch to the remote repository, handles the first-time push."""
+        VersionHelper.assert_git_configured()
         try:
-            repo = Repo(".")
+            repo = Repo(archive_path)
             if not repo.remotes:
                 raise AssertionError(
                     "No remote repository configured. Please add a remote."
@@ -80,80 +83,58 @@ class VersionHelper:
             logger.error(f"Failed to push: {str(e)}")
 
     @staticmethod
-    def show_changes(archive_path: Union[str, Path]):
-        """Show a summary of changes in the archive directory before staging"""
-        archive_path = Path(archive_path)
-
+    def commit_repo(
+        archive_path:Union[str, Path],
+        message: str,
+        author_name: Optional[str] = None,
+        author_email: Optional[str] = None,
+    ) -> None:
+        VersionHelper.assert_git_configured()
         try:
-            # Initialize the repository
             repo = Repo(archive_path)
-
-            if repo.is_dirty(untracked_files=True):
-                changes = defaultdict(list)
-
-                # Get the list of changed files (staged and unstaged)
-                diff_index = repo.index.diff(None)  # Unstaged changes
-                for diff_item in diff_index:
-                    if diff_item.change_type == "M":
-                        changes["modified"].append(diff_item.a_path)
-                    elif diff_item.change_type == "A":
-                        changes["added"].append(diff_item.a_path)
-                    elif diff_item.change_type == "D":
-                        changes["deleted"].append(diff_item.a_path)
-
-                # Get the untracked files
-                untracked_files = repo.untracked_files
-                changes["untracked"] = untracked_files
-
-                # Log the changes detected
-                logger.info("Changes detected:")
-                total_changes = sum(len(files) for files in changes.values())
-                logger.info(f"Total files changed: {total_changes}")
-
-                for change_type, files in changes.items():
-                    if files:
-                        logger.info(f"{change_type.capitalize()} files ({len(files)}):")
-                        for file in files[:5]:  # Show up to 5 files for each type
-                            logger.info(f"  - {file}")
-                        if len(files) > 5:
-                            logger.info(f"  ... and {len(files) - 5} more")
+            if author_name and author_email:
+                repo.git.commit(m=message, author=f"{author_name} <{author_email}>")
             else:
-                logger.info("No changes detected.")
-
-        except InvalidGitRepositoryError:
-            logger.error(f"The directory {archive_path} is not a valid git repository.")
+                repo.git.commit(m=message)
+            logger.info("Changes committed successfully.")
         except GitCommandError as e:
-            logger.error(f"Git command error: {e}")
-        except Exception as e:
-            logger.error(f"Error: {e}")
-
-
+            logger.error(f"Failed to commit changes: {str(e)}")
 
     @staticmethod
-    def initialize_repo(cad_archive_path: Union[str, Path], author_name: Optional[str] = None, author_email: Optional[str] = None):
+    def stage_repo(archive_path:Union[str, Path]) -> None:
+        VersionHelper.assert_git_configured()
+        try:
+            repo = Repo(archive_path)
+            repo.git.add(A=True)
+            logger.info("Staged all changes.")
+        except GitCommandError as e:
+            logger.error(f"Failed to stage changes: {str(e)}")
+
+    @staticmethod
+    def initialize_repo(archive_path: Union[str, Path], remote_url: Optional[str] = None) -> None:
         """
         Initialize a new Git repository, configure user information, and make an initial commit.
         """
-        cad_archive_path = Path(cad_archive_path)
 
+        VersionHelper.assert_git_configured()
+        VersionHelper.assety_valid_remote_url(remote_url)
+        
         try:
             # Initialize the repository
-            repo = Repo.init(cad_archive_path, initial_branch='main')
+            repo = Repo.init(archive_path, initial_branch="main")
             logger.info("Git repository initialized with 'main' as the default branch.")
-            
-            # Configure author name and email if provided
-            if author_name:
-                with repo.config_writer() as git_config:
-                    git_config.set_value("user", "name", author_name)
-                    author_email = author_email or "<>"
-                    git_config.set_value("user", "email", author_email)
-                logger.info(f"Added author information: {author_name} <{author_email}>")
-            
+
+            if remote_url:
+                repo.create_remote('origin', remote_url)
+                logger.info(f"Remote 'origin' added with URL: {remote_url}")
+
             # Stage all files for the initial commit
             repo.git.add(A=True)  # Equivalent to 'git add .'
             logger.info("Staged all files for initial commit.")
-            
+
         except GitCommandError as e:
             logger.error(f"Git command error: {e}")
         except Exception as e:
             logger.error(f"Error initializing Git repository: {e}")
+
+

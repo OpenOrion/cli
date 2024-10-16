@@ -6,7 +6,7 @@ import pandas as pd
 from orion_cli.models.archive import (
     ArchiveConfig,
     Assembly,
-    AssemblyIndex,
+    ArchiveIndex,
     CadArchive,
     CatalogItem,
     Inventory,
@@ -23,15 +23,12 @@ class ArchiveHelper:
     def process_assembly(
         cq_assembly: cq.Assembly,
         archive: Optional[CadArchive] = None,
-        index: Optional[AssemblyIndex] = None,
         curr_abs_location: Optional[Location] = None,
         curr_path: str = "",
     ):
         # initialize archive and index if not provided
         if archive is None:
             archive = CadArchive()
-        if index is None:
-            index = AssemblyIndex()
 
         # convert location to absolute location
         rel_location = Location.convert(cq_assembly.loc)
@@ -44,8 +41,8 @@ class ArchiveHelper:
         assemblies = [root_assembly]
 
         if curr_path == "":
-            index.is_assembly_modified.clear()
-            index.is_part_modified.clear()
+            archive.index.is_assembly_modified.clear()
+            archive.index.is_part_modified.clear()
             archive.add_assembly(root_assembly)
 
         is_modified = False
@@ -54,7 +51,6 @@ class ArchiveHelper:
                 subassemblies, is_sub_modified = ArchiveHelper.process_assembly(
                     cq_subassembly,
                     archive,
-                    index,
                     abs_location,
                     root_assembly.path,
                 )
@@ -63,30 +59,30 @@ class ArchiveHelper:
 
                 is_modified = is_modified or is_sub_modified
                 if is_modified:
-                    index.is_assembly_modified.add(root_assembly.id)
+                    archive.index.is_assembly_modified.add(root_assembly.id)
             else:
                 base_part, part_ref = ArchiveHelper.get_part(
                     cq_subassembly,
                     root_assembly.path,
                     abs_location,
                     archive.inventory,
-                    index,
+                    archive.index,
                     archive.config,
                 )
 
                 is_modified = not (
                     # has the path been previously indexed
-                    index.prev_archive
-                    and part_ref.id in index.prev_archive.part_refs
+                    archive.index.prev_archive
+                    and part_ref.id in archive.index.prev_archive.part_refs
                     and
                     # if the part checksum is the same
-                    index.prev_archive.part_refs[part_ref.id].variation
+                    archive.index.prev_archive.part_refs[part_ref.id].variation
                     == part_ref.variation
                 )
 
                 if is_modified:
-                    index.is_part_modified.add(part_ref.variation)
-                    index.is_assembly_modified.add(part_ref.id)
+                    archive.index.is_part_modified.add(part_ref.variation)
+                    archive.index.is_assembly_modified.add(part_ref.id)
 
                 # add part reference to root assembly and archive
                 root_assembly.add_part_ref(part_ref, archive)
@@ -96,7 +92,7 @@ class ArchiveHelper:
                     archive.inventory.parts[part_ref.variation.checksum] = base_part
 
                 ArchiveHelper.process_variations(
-                    part_ref, cq_subassembly, archive, index
+                    part_ref, cq_subassembly, archive
                 )
 
         return assemblies, is_modified
@@ -106,7 +102,6 @@ class ArchiveHelper:
         part_ref: PartRef,
         cq_assembly: cq.Assembly,
         archive: CadArchive,
-        index: AssemblyIndex,
     ):
         # add part variation to index
         part_checksum = part_ref.variation.checksum
@@ -142,22 +137,23 @@ class ArchiveHelper:
             part_variation = existing_variation
 
         # keep the metadata from the previous archive
-        if index and index.prev_archive:
-            prev_variation = index.prev_archive.inventory.get_variation_from_color(
+        if archive.index.prev_archive:
+            prev_variation = archive.index.prev_archive.inventory.get_variation_from_color(
                 part_ref.variation.checksum,
                 part_color,
             )
             if prev_variation and not part_variation.metadata:
                 part_variation.metadata = prev_variation.metadata
 
-        ArchiveHelper.assign_unique_part_names(part_ref, archive, index)
+        ArchiveHelper.assign_unique_part_names(part_ref, archive)
 
     # TODO: Clean this up more
     @staticmethod
     def assign_unique_part_names(
-        part_ref: PartRef, archive: CadArchive, index: "AssemblyIndex"
+        part_ref: PartRef, archive: CadArchive
     ):
         part_name = part_ref.name
+        index = archive.index
         # check if part name already exists
         if part_name in index.part_names:
             prev_part_ref = index.part_names[part_name]
@@ -201,7 +197,7 @@ class ArchiveHelper:
         assembly_path: str,
         abs_location: Optional[Location] = None,
         inventory: Optional[Inventory] = None,
-        index: Optional[AssemblyIndex] = None,
+        index: Optional[ArchiveIndex] = None,
         config: Optional[ArchiveConfig] = None,
     ):
         is_part_reference = (config and config.use_part_references) and (
@@ -256,11 +252,11 @@ class ArchiveHelper:
         assembly_path: str,
         abs_location: Optional[Location] = None,
         inventory: Optional[Inventory] = None,
-        index: Optional[AssemblyIndex] = None,
+        index: Optional[ArchiveIndex] = None,
         normalize_axis: bool = False,
     ):
         if index is None:
-            index = AssemblyIndex()
+            index = ArchiveIndex()
 
         # TODO: check if this is correct
         part_rel_location = Location.convert(cq_subassembly.loc)

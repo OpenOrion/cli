@@ -6,14 +6,15 @@ import shutil
 from orion_cli.helpers.archive_helper import ArchiveHelper
 from orion_cli.helpers.asset_helper import AssetHelper, SVGOptions
 from orion_cli.helpers.cad_helper import CadHelper
+from orion_cli.helpers.version_helper import VersionHelper
 from orion_cli.models.archive import (
     ArchiveConfig,
-    AssemblyIndex,
+    ArchiveIndex,
     CadArchive,
     CatalogItem,
     Inventory,
     InventoryCatalog,
-    Assembly
+    Assembly,
 )
 from orion_cli.templates.README_template import README_TEMPLATE
 from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
@@ -59,7 +60,6 @@ class ArchiveService:
     def write_assets(
         archive_path: Union[Path, str],
         archive: CadArchive,
-        index: Optional[AssemblyIndex] = None,
         verbose=False,
     ):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
@@ -81,9 +81,7 @@ class ArchiveService:
             # Generate SVGs for each part if they are modified or don't exist
             svg_path = assets_path / f"{catalog_item.name}.svg"
             if (
-                not index
-                or index
-                and checksum in index.is_part_modified
+                checksum in archive.index.is_part_modified
                 or not svg_path.exists()
             ):
                 logger.info(f"- Generating SVG for part '{catalog_item.name}'")
@@ -103,9 +101,9 @@ class ArchiveService:
         # Generate SVG for root assembly
         main_assembly_svg_path = assets_path / f"{archive.root_assembly.long_name}.svg"
         root_asm_modified = (
-            index and archive.root_assembly.id in index.is_assembly_modified
+            archive.root_assembly.id in archive.index.is_assembly_modified
         )
-        if not index or root_asm_modified or not main_assembly_svg_path.exists():
+        if root_asm_modified or not main_assembly_svg_path.exists():
             logger.info(
                 f"- Generating SVG for root assembly '{archive.root_assembly.name}', this may take a sec ..."
             )
@@ -164,7 +162,6 @@ class ArchiveService:
     def write_archive(
         archive_path: Union[Path, str],
         archive: CadArchive,
-        index: Optional[AssemblyIndex] = None,
         verbose=False,
     ):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
@@ -184,7 +181,7 @@ class ArchiveService:
         # Write assets
         if archive.config.include_assets:
             logger.info(f"\n\n")
-            ArchiveService.write_assets(archive_path, archive, index, verbose)
+            ArchiveService.write_assets(archive_path, archive, verbose)
 
         # Write config
         config_path = archive_path / "config.yaml"
@@ -195,27 +192,30 @@ class ArchiveService:
 
     @staticmethod
     def create_archive(
-        archive_path: Optional[Path] = None,
+        archive_path: Path = None,
         cad_path: Optional[Path] = None,
+        write=False,
         config: Optional[ArchiveConfig] = None,
         verbose=False,
+        remote_url: Optional[str] = None,
+        include_git=True,
     ):
-        logger.info(f"Creating archive '{config.name}' at {archive_path}")
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
+        logger.info(f"Creating archive at {archive_path}")
         archive = CadArchive()
 
         if config:
             archive.config = config
+
         if cad_path:
             logger.info(f"\n\nLoading in step file {cad_path}")
             cq_assembly = CadHelper.import_cad(cad_path)
             ArchiveHelper.process_assembly(cq_assembly, archive)
-        if archive_path:
-            ArchiveService.write_archive(archive_path, archive, verbose=verbose)
 
-        # Copy CAD file to archive directory
-        cad_file_name = cad_path.name
-        cad_archive_step_file = archive_path / cad_file_name
-        shutil.copy2(cad_path, cad_archive_step_file)
+        if write:
+            ArchiveService.write_archive(archive_path, archive, verbose=verbose)
+            if include_git:
+                VersionHelper.initialize_repo(archive_path, remote_url)
 
         return archive
 
@@ -226,23 +226,43 @@ class ArchiveService:
         write=False,
         config: Optional[ArchiveConfig] = None,
         verbose=False,
+        include_git=True,
     ):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
         prev_archive = ArchiveService.read_archive(archive_path)
         cq_assembly = CadHelper.import_step(cad_path)
 
-        revised_archive = CadArchive()
+        revised_archive = CadArchive(index=ArchiveIndex(prev_archive=prev_archive))
         if config:
             revised_archive.config = config
-        index = AssemblyIndex(prev_archive=prev_archive)
-        ArchiveService.process_assembly(cq_assembly, revised_archive, index)
+
+        ArchiveHelper.process_assembly(cq_assembly, revised_archive)
 
         if write:
             ArchiveService.write_archive(
-                archive_path, revised_archive, index, verbose=verbose
+                archive_path, revised_archive, verbose=verbose
             )
+            if include_git:
+                VersionHelper.stage_repo(archive_path)
 
         return revised_archive
+
+    @staticmethod
+    def deploy_archive(
+        archive_path: Union[Path, str],
+        deployment_msg: str,
+        author_name: Optional[str] = None,
+        author_email: Optional[str] = None,
+        verbose=False,
+    ):
+        logger.setLevel(logging.INFO if verbose else logging.ERROR)
+
+        archive_path = Path(archive_path)
+        assert archive_path.is_dir(), f"archive directory not found: {archive_path}"
+
+        logger.info(f"Deploying archive to remote repository")
+        VersionHelper.commit_repo(deployment_msg, author_name, author_email)
+        VersionHelper.push_repo()
 
     @staticmethod
     def read_archive(archive_path: Union[Path, str]):
@@ -315,4 +335,5 @@ class ArchiveService:
             # open html in browser
             if auto_open:
                 import webbrowser
+
                 webbrowser.open(f"file://{html_path}")

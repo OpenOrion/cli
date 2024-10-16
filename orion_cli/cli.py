@@ -4,7 +4,8 @@ import pkg_resources
 from pathlib import Path
 from typing import Optional, Union
 from orion_cli.services.log_service import logger
-from orion_cli.helpers.remote_helper import VersionHelper
+from orion_cli.helpers.version_helper import VersionHelper
+from orion_cli.models.archive import ArchiveConfig
 from orion_cli.services.archive_service import ArchiveService
 from orion_cli.services.version_service import VersionService
 
@@ -51,19 +52,18 @@ def create_command(
     name: str, cad_path: str, remote_url: Optional[str], include_assets: bool
 ):
     """Create a new archive"""
-    archive_path = Path.cwd()
-
+    curr_directory_path = Path.cwd()
     name = str(click.prompt("Please enter the archive name")).strip()
+    archive_path = curr_directory_path / name
 
-    full_archive_path = archive_path / name
-    if full_archive_path.exists():
-        click.echo(f"archive '{name}' already exists at {full_archive_path}")
+    if archive_path.exists():
+        click.echo(f"archive '{name}' already exists at {archive_path}")
         overwrite = click.confirm("Would you like to overwrite it?", default=False)
         if not overwrite:
             click.echo("Exiting without creating archive.")
             return
         # Remove the archive directory and its contents
-        shutil.rmtree(full_archive_path)
+        shutil.rmtree(archive_path)
 
     # Prompt the user for inputs if not provided
     if not cad_path:
@@ -82,10 +82,29 @@ def create_command(
             remote_url = click.prompt("Remote Git Repository")
 
     # Create the archive
-    VersionService.initialize_archive(
-        name, archive_path, cad_path, remote_url, include_assets
+
+    curr_directory_path = curr_directory_path / name
+    cad_path = Path(cad_path)
+
+    # Create and save archive config
+    config = ArchiveConfig(
+        include_assets=include_assets,
     )
-    click.echo(f"archive '{name}' has been initialized at {archive_path / name}")
+
+    cad_archive = ArchiveService.create_archive(
+        archive_path=archive_path,
+        cad_file=cad_path,
+        config=config,
+        remote_url=remote_url,
+        verbose=True,
+
+    )
+
+
+    VersionService.initialize_archive(
+        name, curr_directory_path, cad_path, remote_url, include_assets
+    )
+    click.echo(f"archive '{name}' has been initialized at {curr_directory_path / name}")
 
 
 @cli.command(name="revision")

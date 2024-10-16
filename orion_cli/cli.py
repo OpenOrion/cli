@@ -4,7 +4,7 @@ import pkg_resources
 from pathlib import Path
 from typing import Optional, Union
 from orion_cli.services.log_service import logger
-from orion_cli.helpers.version_helper import VersionHelper
+from orion_cli.helpers.git_helper import GitHelper
 from orion_cli.models.archive import ArchiveConfig
 from orion_cli.services.archive_service import ArchiveService
 from orion_cli.services.version_service import VersionService
@@ -97,9 +97,7 @@ def create_command(
         config=config,
         remote_url=remote_url,
         verbose=True,
-
     )
-
 
     VersionService.initialize_archive(
         name, curr_directory_path, cad_path, remote_url, include_assets

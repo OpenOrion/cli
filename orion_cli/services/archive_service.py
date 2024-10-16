@@ -6,7 +6,7 @@ import shutil
 from orion_cli.helpers.archive_helper import ArchiveHelper
 from orion_cli.helpers.asset_helper import AssetHelper, SVGOptions
 from orion_cli.helpers.cad_helper import CadHelper
-from orion_cli.helpers.version_helper import VersionHelper
+from orion_cli.helpers.git_helper import GitHelper
 from orion_cli.models.archive import (
     ArchiveConfig,
     ArchiveIndex,
@@ -80,10 +80,7 @@ class ArchiveService:
 
             # Generate SVGs for each part if they are modified or don't exist
             svg_path = assets_path / f"{catalog_item.name}.svg"
-            if (
-                checksum in archive.index.is_part_modified
-                or not svg_path.exists()
-            ):
+            if checksum in archive.index.is_part_modified or not svg_path.exists():
                 logger.info(f"- Generating SVG for part '{catalog_item.name}'")
                 svg = AssetHelper.getSVG(part, part_svg_options)
                 # svg = getSVG(part, part_svg_options)
@@ -215,7 +212,7 @@ class ArchiveService:
         if write:
             ArchiveService.write_archive(archive_path, archive, verbose=verbose)
             if include_git:
-                VersionHelper.initialize_repo(archive_path, remote_url)
+                GitHelper.initialize_repo(archive_path, remote_url)
 
         return archive
 
@@ -236,14 +233,13 @@ class ArchiveService:
         if config:
             revised_archive.config = config
 
+        # TODO: fix this, revise not working
         ArchiveHelper.process_assembly(cq_assembly, revised_archive)
 
         if write:
-            ArchiveService.write_archive(
-                archive_path, revised_archive, verbose=verbose
-            )
-            if include_git:
-                VersionHelper.stage_repo(archive_path)
+            ArchiveService.write_archive(archive_path, revised_archive, verbose=verbose)
+            # if include_git:
+            #     GitHelper.stage_repo(archive_path)
 
         return revised_archive
 
@@ -261,8 +257,8 @@ class ArchiveService:
         assert archive_path.is_dir(), f"archive directory not found: {archive_path}"
 
         logger.info(f"Deploying archive to remote repository")
-        VersionHelper.commit_repo(deployment_msg, author_name, author_email)
-        VersionHelper.push_repo()
+        GitHelper.commit_repo(deployment_msg, author_name, author_email)
+        GitHelper.push_repo()
 
     @staticmethod
     def read_archive(archive_path: Union[Path, str]):

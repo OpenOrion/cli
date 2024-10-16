@@ -6,7 +6,7 @@ import git
 from git import Repo, GitCommandError, InvalidGitRepositoryError
 
 
-class VersionHelper:
+class GitHelper:
     @staticmethod
     def get_remote_url() -> Optional[str]:
         try:
@@ -16,7 +16,7 @@ class VersionHelper:
         except (InvalidGitRepositoryError, AttributeError):
             logger.info("No remote URL found.")
             return None
-    
+
     @staticmethod
     def assety_valid_remote_url(remote_url: str) -> None:
         try:
@@ -25,8 +25,6 @@ class VersionHelper:
             repo.git.ls_remote(remote_url)
         except GitCommandError:
             raise AssertionError(f"Remote URL {remote_url} is not valid or accessible.")
-
-
 
     @staticmethod
     def assert_git_installed() -> bool:
@@ -37,7 +35,7 @@ class VersionHelper:
 
     @staticmethod
     def assert_git_configured() -> None:
-        VersionHelper.assert_git_installed()
+        GitHelper.assert_git_installed()
         try:
             repo = Repo(".")
             user_name = repo.config_reader().get_value("user", "name", None)
@@ -53,9 +51,9 @@ class VersionHelper:
             raise AssertionError("Git repository not found or Git command failed.")
 
     @staticmethod
-    def push_repo(archive_path:Union[str, Path], branch_name: str = "main") -> None:
+    def push_repo(archive_path: Union[str, Path], branch_name: str = "main") -> None:
         """Pushes the branch to the remote repository, handles the first-time push."""
-        VersionHelper.assert_git_configured()
+        GitHelper.assert_git_configured()
         try:
             repo = Repo(archive_path)
             if not repo.remotes:
@@ -84,12 +82,12 @@ class VersionHelper:
 
     @staticmethod
     def commit_repo(
-        archive_path:Union[str, Path],
+        archive_path: Union[str, Path],
         message: str,
         author_name: Optional[str] = None,
         author_email: Optional[str] = None,
     ) -> None:
-        VersionHelper.assert_git_configured()
+        GitHelper.assert_git_configured()
         try:
             repo = Repo(archive_path)
             if author_name and author_email:
@@ -101,8 +99,8 @@ class VersionHelper:
             logger.error(f"Failed to commit changes: {str(e)}")
 
     @staticmethod
-    def stage_repo(archive_path:Union[str, Path]) -> None:
-        VersionHelper.assert_git_configured()
+    def stage_repo(archive_path: Union[str, Path]) -> None:
+        GitHelper.assert_git_configured()
         try:
             repo = Repo(archive_path)
             repo.git.add(A=True)
@@ -111,21 +109,23 @@ class VersionHelper:
             logger.error(f"Failed to stage changes: {str(e)}")
 
     @staticmethod
-    def initialize_repo(archive_path: Union[str, Path], remote_url: Optional[str] = None) -> None:
+    def initialize_repo(
+        archive_path: Union[str, Path], remote_url: Optional[str] = None
+    ) -> None:
         """
         Initialize a new Git repository, configure user information, and make an initial commit.
         """
 
-        VersionHelper.assert_git_configured()
-        VersionHelper.assety_valid_remote_url(remote_url)
-        
+        GitHelper.assert_git_configured()
+        GitHelper.assety_valid_remote_url(remote_url)
+
         try:
             # Initialize the repository
             repo = Repo.init(archive_path, initial_branch="main")
             logger.info("Git repository initialized with 'main' as the default branch.")
 
             if remote_url:
-                repo.create_remote('origin', remote_url)
+                repo.create_remote("origin", remote_url)
                 logger.info(f"Remote 'origin' added with URL: {remote_url}")
 
             # Stage all files for the initial commit
@@ -136,5 +136,3 @@ class VersionHelper:
             logger.error(f"Git command error: {e}")
         except Exception as e:
             logger.error(f"Error initializing Git repository: {e}")
-
-

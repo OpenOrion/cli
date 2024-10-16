@@ -217,13 +217,13 @@ class CadHelper:
 
 
     @staticmethod
-    def get_part_checksum(solid: Union[cq.Solid, TopoDS_Solid], precision=3):
-        solid = solid if isinstance(solid, cq.Solid) else cq.Solid(solid)
+    def get_shape_checksum(shape: cq.Shape, precision=3):
+        shape = shape if isinstance(shape, cq.Shape) else cq.Shape(shape)
 
         vertices = np.array(
             [
                 CadHelper.vertex_to_Tuple(TopoDS.Vertex_s(v))
-                for v in solid._entities("Vertex")
+                for v in shape._entities("Vertex")
             ]
         )
 
@@ -234,7 +234,9 @@ class CadHelper:
         sorted_vertices = rounded_vertices[sorted_indices]
 
         vertices_hash = hashlib.md5(sorted_vertices.tobytes()).digest()
-        return hashlib.md5(vertices_hash).hexdigest()
+        area_hash = hashlib.md5(str(np.round(shape.Area(), precision)).encode()).digest()
+        combined_hash = hashlib.md5(vertices_hash + area_hash).digest()
+        return hashlib.md5(combined_hash).hexdigest()
 
     @staticmethod
     def get_viewer(

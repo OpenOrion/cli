@@ -2,7 +2,6 @@ from typing import Optional, Sized, cast
 import numpy as np
 import cadquery as cq
 import cadquery as cq
-import pandas as pd
 from orion_cli.models.archive import (
     ArchiveConfig,
     Assembly,
@@ -71,12 +70,11 @@ class ArchiveHelper:
                 )
 
                 is_modified = not (
-                    # has the path been previously indexed
+                    # has the part id been previously indexed
                     archive.index.prev_archive
-                    and part_ref.id in archive.index.prev_archive.part_refs
-                    and
+                    and part_ref.path in archive.index.prev_archive.paths
                     # if the part checksum is the same
-                    archive.index.prev_archive.part_refs[part_ref.id].variation
+                    and archive.index.prev_archive.paths[part_ref.path].variation
                     == part_ref.variation
                 )
 
@@ -91,9 +89,7 @@ class ArchiveHelper:
                 if part_ref.variation.checksum not in archive.inventory.parts:
                     archive.inventory.parts[part_ref.variation.checksum] = base_part
 
-                ArchiveHelper.process_variations(
-                    part_ref, cq_subassembly, archive
-                )
+                ArchiveHelper.process_variations(part_ref, cq_subassembly, archive)
 
         return assemblies, is_modified
 
@@ -138,9 +134,11 @@ class ArchiveHelper:
 
         # keep the metadata from the previous archive
         if archive.index.prev_archive:
-            prev_variation = archive.index.prev_archive.inventory.get_variation_from_color(
-                part_ref.variation.checksum,
-                part_color,
+            prev_variation = (
+                archive.index.prev_archive.inventory.get_variation_from_color(
+                    part_ref.variation.checksum,
+                    part_color,
+                )
             )
             if prev_variation and not part_variation.metadata:
                 part_variation.metadata = prev_variation.metadata
@@ -149,9 +147,7 @@ class ArchiveHelper:
 
     # TODO: Clean this up more
     @staticmethod
-    def assign_unique_part_names(
-        part_ref: PartRef, archive: CadArchive
-    ):
+    def assign_unique_part_names(part_ref: PartRef, archive: CadArchive):
         part_name = part_ref.name
         index = archive.index
         # check if part name already exists
@@ -227,7 +223,7 @@ class ArchiveHelper:
         inventory: Optional[Inventory] = None,
     ):
         base_part = cast(cq.Solid, cast(cq.Workplane, cq_subassembly.obj).val())
-        part_checksum = CadHelper.get_part_checksum(base_part)
+        part_checksum = CadHelper.get_shape_checksum(base_part)
 
         part_color = (
             list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple()))
@@ -267,7 +263,7 @@ class ArchiveHelper:
 
         # check if part has been aligned before
         if normalize_axis:
-            aligned_checksum = CadHelper.get_part_checksum(aligned_part)
+            aligned_checksum = CadHelper.get_shape_checksum(aligned_part)
             if index.prev_archive and aligned_checksum in index.aligned_refs:
                 part_ref = index.aligned_refs[aligned_checksum]
                 base_part = index.prev_archive.inventory.parts[
@@ -297,7 +293,7 @@ class ArchiveHelper:
             rot_mat_adjustment = CadHelper.align_parts(base_part, normalized_part)
             rotmat = rotmat.dot(rot_mat_adjustment)
 
-        part_checksum = CadHelper.get_part_checksum(base_part)
+        part_checksum = CadHelper.get_shape_checksum(base_part)
         part_color = (
             list(CadHelper.rgba_float_to_int(cq_subassembly.color.toTuple()))
             if cq_subassembly.color

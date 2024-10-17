@@ -6,7 +6,7 @@ from typing import Iterable, Optional, Union, cast
 from cachetools import LRUCache, cached
 import numpy as np
 from OCP.GProp import GProp_GProps
-from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex, TopoDS, TopoDS_Solid
+from OCP.TopoDS import TopoDS_Shape, TopoDS_Vertex
 from OCP.BRepBuilderAPI import BRepBuilderAPI_Transform
 from OCP.BRepTools import BRepTools
 from OCP.BRep import BRep_Builder, BRep_Tool
@@ -15,13 +15,14 @@ from OCP.BRepGProp import BRepGProp
 import cadquery as cq
 from ocp_tessellate.stepreader import StepReader
 from orion_cli.helpers.file_helper import FileHelper
-from jupyter_cadquery.tessellator import save_cache
+from jupyter_cadquery.tessellator import save_cache, get_shape_checksum
 
 RotationMatrixLike = Union[np.ndarray, list[list[float]]]
 VectorLike = Union[np.ndarray, list[float]]
 
 
 class CadHelper:
+    get_shape_checksum = staticmethod(get_shape_checksum)
     @staticmethod
     def rgba_int_to_float(rgb_int: Iterable[float]):
         """
@@ -217,51 +218,6 @@ class CadHelper:
             return rotmat
 
         raise ValueError(f"failed to align, error: {error}")
-
-
-    # @staticmethod
-    # def get_shape_checksum(shape: cq.Shape, precision=3):
-    #     shape = shape if isinstance(shape, cq.Shape) else cq.Shape(shape)
-
-    #     vertices = np.array(
-    #         [
-    #             CadHelper.vertex_to_Tuple(TopoDS.Vertex_s(v))
-    #             for v in shape._entities("Vertex")
-    #         ]
-    #     )
-        
-    #     rounded_vertices = np.round(vertices, precision)
-    #     rounded_vertices[rounded_vertices == -0] = 0
-
-    #     sorted_indices = np.lexsort(rounded_vertices.T)
-    #     sorted_vertices = rounded_vertices[sorted_indices]
-
-    #     vertices_hash = hashlib.md5(sorted_vertices.tobytes()).digest()
-    #     area_hash = hashlib.md5(str(np.round(shape.Area(), precision)).encode()).digest()
-    #     combined_hash = hashlib.md5(vertices_hash + area_hash).digest()
-    #     return hashlib.md5(combined_hash).hexdigest()
-
-    @staticmethod
-    @cached(cache={}, key=lambda shape: shape.hashCode())
-    def get_shape_checksum(shape: cq.Solid):
-        # Ensure shape is of correct type
-        shape = shape if isinstance(shape, cq.Solid) else cq.Shape(shape)
-        
-        # Use BytesIO to store the BREP data
-        brep_io = BytesIO()
-        
-        # Export the shape to BREP format
-        shape.exportBrep(brep_io)
-        
-        # Move to the beginning of the BytesIO stream
-        brep_io.seek(0)
-        
-        # Get the binary data from the BytesIO stream
-        brep_data = brep_io.read()
-        
-        # Ensure the data is in bytes and calculate the checksum
-        return hashlib.md5(brep_data).hexdigest()
-
 
     @staticmethod
     def get_viewer(

@@ -1,4 +1,4 @@
-from typing import Optional, Sized, cast
+from typing import Optional, Sized, Union, cast
 import numpy as np
 import cadquery as cq
 import cadquery as cq
@@ -10,10 +10,10 @@ from orion_cli.models.archive import (
     CatalogItem,
     Inventory,
     InventoryPartVariation,
-    InventoryVariationRef,
-    Location,
+    PartVariationRef,
     PartRef,
 )
+from orion_cli.models.assembly import Location, AssemblyId, Assembly
 from orion_cli.helpers.cad_helper import CadHelper
 
 
@@ -42,7 +42,8 @@ class ArchiveHelper:
         if curr_path == "":
             archive.index.is_assembly_modified.clear()
             archive.index.is_part_modified.clear()
-            archive.add_assembly(root_assembly)
+            ArchiveHelper.add_assembly(archive, root_assembly)
+
 
         is_modified = False
         for cq_subassembly in cq_assembly.children:
@@ -53,7 +54,7 @@ class ArchiveHelper:
                     abs_location,
                     root_assembly.path,
                 )
-                root_assembly.add_child(subassemblies[0], archive)
+                ArchiveHelper.add_assembly(archive, subassemblies[0], root_assembly)
                 assemblies.extend(subassemblies)
 
                 is_modified = is_modified or is_sub_modified
@@ -83,7 +84,7 @@ class ArchiveHelper:
                     archive.index.is_assembly_modified.add(part_ref.id)
 
                 # add part reference to root assembly and archive
-                root_assembly.add_part_ref(part_ref, archive)
+                ArchiveHelper.add_part_ref(archive, part_ref, root_assembly)
 
                 # add part to inventory
                 if part_ref.variation.checksum not in archive.inventory.parts:
@@ -237,7 +238,7 @@ class ArchiveHelper:
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
             name=cq_subassembly.name,
-            variation=InventoryVariationRef(checksum=part_checksum, id=variation_id),
+            variation=PartVariationRef(checksum=part_checksum, id=variation_id),
             location=location if not location.is_zero else None,
         )
         return base_part, part_ref
@@ -306,7 +307,7 @@ class ArchiveHelper:
         part_ref = PartRef(
             path=f"{assembly_path}/{cq_subassembly.name}",
             name=cq_subassembly.name,
-            variation=InventoryVariationRef(checksum=part_checksum, id=variation_id),
+            variation=PartVariationRef(checksum=part_checksum, id=variation_id),
             location=Location(
                 position=offset,
                 orientation=rotmat,
@@ -321,3 +322,147 @@ class ArchiveHelper:
             index.aligned_refs[aligned_checksum] = part_ref
 
         return base_part, part_ref
+
+    @staticmethod
+    def assembly_to_cq(
+        archive: CadArchive,
+        assembly: Assembly,
+        abs_location: Optional[Location] = None,
+    ):
+        cq_assembly = cq.Assembly(name=assembly.name)
+        for subassembly_id in assembly.children:
+            subassembly = archive.assemblies[subassembly_id]
+            asm_abs_location = Location.convert(subassembly.location).transform(
+                abs_location
+            )
+            cq_assembly.add(
+                ArchiveHelper.assembly_to_cq(archive, subassembly),
+                loc=asm_abs_location.to_cq(),
+                name=subassembly.name,
+            )
+        for part_ref in assembly.parts:
+            part = archive.inventory.parts[part_ref.variation.checksum]
+            cq_loc = part_ref.location and part_ref.location.to_cq()
+            part_variation = archive.inventory.get_variation(part_ref.variation)
+
+            # TODO: find a better solution to handle negative rotation determinants (mirrors)
+            cq_color = (
+                cq.Color(*CadHelper.rgba_int_to_float(part_variation.color))
+                if part_variation.color
+                else None
+            )
+            if cq_loc and cq_loc.wrapped.Transformation().IsNegative():
+                part_abs_location = Location.convert(part_ref.location).transform(
+                    abs_location
+                )
+                aligned_part = CadHelper.transform_solid(
+                    part, part_abs_location.orientation, part_abs_location.position
+                )
+                cq_assembly.add(aligned_part, color=cq_color, name=part_ref.name)
+            else:
+                cq_assembly.add(part, color=cq_color, name=part_ref.name, loc=cq_loc)
+
+        return cq_assembly
+
+    @staticmethod
+    def add_assembly(
+        archive: CadArchive,
+        assembly: Assembly,
+        parent_assembly: Union[str, Assembly, None] = None,
+        name: Optional[str] = None,
+    ):
+        child_name = name or assembly.name
+        assert child_name, "Invalid assembly name"
+
+        parent_assembly = (
+            archive.get_assembly(parent_assembly)
+            if isinstance(parent_assembly, str)
+            else parent_assembly
+        )
+        if parent_assembly:
+            new_path = f"{parent_assembly.path}/{child_name}"
+            assert new_path not in archive.paths, f"Path '{new_path}' already exists"
+            assert (
+                assembly.id not in parent_assembly.children
+            ), f"Assembly '{assembly.id}' already exists"
+            # Update all if any child paths
+            
+            if assembly.path != new_path:
+                for path in archive.paths:
+                    if path.startswith(assembly.path):
+                        archive.paths[path.replace(assembly.path, new_path, 1)] = archive.paths[
+                            path
+                        ]
+                        del archive.paths[path]
+                assembly.path = new_path
+            parent_assembly.children.append(assembly.id)
+
+
+        # Add the new path and id
+        archive.assemblies[assembly.id] = assembly
+        archive.paths[assembly.path] = ("assembly", assembly.id)
+
+    @staticmethod
+    def add_part_ref(
+        archive: CadArchive,
+        part_ref: PartRef,
+        assembly: Union[str, Assembly],
+        name: Optional[str] = None,
+    ):
+        child_name = name or part_ref.name
+        assert child_name, "Invalid part reference name"
+        assembly = archive.get_assembly(assembly) if isinstance(assembly, str) else assembly
+
+        new_path = f"{assembly.path}/{child_name}"
+        assert new_path not in archive.paths, f"Path '{new_path}' already exists"
+        assert (
+            part_ref.id not in assembly.parts
+        ), f"Part reference {part_ref.id} already exists"
+
+        part_ref.path = new_path
+        assembly.parts.append(part_ref)
+        archive.part_refs[part_ref.id] = part_ref
+        archive.paths[part_ref.path] = ("part", part_ref.id)
+
+    @staticmethod
+    def remove_assembly(archive: CadArchive, assembly_id: AssemblyId):
+        assembly = archive.get_assembly(assembly_id)
+        parent_assembly = archive.get_by_path(assembly.parent_path)
+
+        assert isinstance(
+            parent_assembly, Assembly
+        ), f"f{assembly.parent_path} is a part not assembly "
+        assert (
+            assembly_id in parent_assembly.children
+        ), f"Assembly '{assembly_id}' not found in parent '{parent_assembly.id}'"
+        assert assembly_id in archive.assemblies, f"Assembly '{assembly_id}' not found"
+        assert assembly.path in archive.paths, f"Assembly '{assembly.path}' not found"
+
+        parent_assembly.children.remove(assembly_id)
+        del archive.assemblies[assembly_id]
+        del archive.paths[assembly.path]
+
+    @staticmethod
+    def remove_part_ref(archive: CadArchive, part_ref_id: AssemblyId):
+        part_ref = archive.part_refs[part_ref_id]
+        parent_assembly = archive.get_by_path(part_ref.parent_path)
+        assert isinstance(
+            parent_assembly, Assembly
+        ), f"{part_ref.parent_path} is a part not assembly"
+
+        for i, part_ref in enumerate(parent_assembly.parts):
+            if part_ref.id == part_ref_id:
+                del parent_assembly.parts[i]
+                break
+        else:
+            assert False, f"Part reference '{part_ref_id}' not found in parent assembly"
+
+        assert (
+            part_ref_id in archive.part_refs
+        ), f"Part reference '{part_ref_id}' not found"
+        assert (
+            part_ref.path in archive.paths
+        ), f"Part reference '{part_ref.path}' not found"
+
+        del archive.part_refs[part_ref_id]
+        del archive.paths[part_ref.path]

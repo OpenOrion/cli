@@ -104,7 +104,8 @@ class ArchiveService:
             logger.info(
                 f"- Generating SVG for root assembly '{archive.root_assembly.name}', this may take a sec ..."
             )
-            root_assembly_cq = archive.root_assembly.to_cq(archive)
+            root_assembly_cq = ArchiveHelper.assembly_to_cq(archive, archive.root_assembly)
+            
             assembly_svg_options = SVGOptions(
                 showAxes=False, marginLeft=20, showHidden=False, strokeWidth=-0.9
             )
@@ -317,7 +318,7 @@ class ArchiveService:
 
         archive_path = Path(archive_path)
         archive = ArchiveService.read_archive(archive_path)
-        cq_assembly = archive.root_assembly.to_cq(archive)
+        cq_assembly = ArchiveHelper.assembly_to_cq(archive, archive.root_assembly)
 
         orion_cache_path = archive_path / ".orion_cache"
         orion_cache_path.mkdir(parents=True, exist_ok=True)

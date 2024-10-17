@@ -4,6 +4,7 @@ from typing import Optional
 import numpy as np
 from typing import Optional, Dict
 
+from orion_cli.helpers.archive_helper import ArchiveHelper
 from orion_cli.models.archive import Assembly, CadArchive
 
 ItemId = str
@@ -81,7 +82,7 @@ class DiffService:
                 # remove from old parent and add to new parent
                 if is_assembly:
                     parent_assembly.remove_child(assembly_id, archive)
-                    new_parent_assembly.add_child(child, archive, new_child_name)
+                    ArchiveHelper.add_assembly(archive, child, new_parent_assembly, new_child_name)
                 else:
                     parent_assembly.remove_part_ref(assembly_id, archive)
                     new_parent_assembly.add_part_ref(child, archive, new_child_name)

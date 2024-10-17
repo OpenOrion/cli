@@ -195,6 +195,8 @@ class ArchiveService:
         config: Optional[ArchiveConfig] = None,
         verbose=False,
         remote_url: Optional[str] = None,
+        author_name: Optional[str] = None,
+        author_email: Optional[str] = None,
         include_git=True,
     ):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
@@ -213,6 +215,7 @@ class ArchiveService:
             ArchiveService.write_archive(archive_path, archive, verbose=verbose)
             if include_git:
                 GitHelper.initialize_repo(archive_path, remote_url)
+                GitHelper.commit_repo(archive_path, "Initial commit", author_name, author_email)
 
         return archive
 

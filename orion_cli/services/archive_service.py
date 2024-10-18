@@ -298,13 +298,15 @@ class ArchiveService:
                         ).parent.as_posix()
                     )
                     archive.assemblies[assembly.id] = assembly
-                    archive.paths[assembly.path] = assembly
+                    archive.paths[assembly.path] = assembly.id
                     for part_ref in assembly.parts:
                         archive.part_refs[part_ref.id] = part_ref
                         part_ref.path = assembly.path + "/" + part_ref.name
-                        archive.paths[part_ref.path] = part_ref
+                        archive.paths[part_ref.path] = part_ref.id
 
         return archive
+
+    
 
     @staticmethod
     def visualize_archive(

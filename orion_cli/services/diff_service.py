@@ -60,7 +60,7 @@ class DiffService:
 
         new_parent_path = "/".join(diff.path.split("/")[:-1]) or "/"
         new_child_name = diff.path.split("/")[-1]
-        new_parent_assembly = archive.get_by_path(new_parent_path)
+        new_parent_assembly = archive.get_by_path(new_parent_path, "assembly")
 
         if diff == "delete":
             if is_assembly:
@@ -77,7 +77,7 @@ class DiffService:
 
             if diff.path:
                 # remove assembly from previous parent
-                parent_assembly = archive.get_by_path(child.parent_path)
+                parent_assembly = archive.get_by_path(child.parent_path, "assembly")
 
                 # remove from old parent and add to new parent
                 if is_assembly:

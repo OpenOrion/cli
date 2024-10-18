@@ -108,9 +108,7 @@ class ArchiveIndex(BaseModel):
 class CadArchive(BaseModel):
     assemblies: OrderedDict[AssemblyId, Assembly] = Field(default_factory=OrderedDict)
     part_refs: OrderedDict[AssemblyId, PartRef] = Field(default_factory=OrderedDict)
-    paths: OrderedDict[AssemblyPath, tuple[Literal["assembly", "part"], AssemblyId]] = (
-        Field(default_factory=OrderedDict)
-    )
+    paths: OrderedDict[AssemblyPath, AssemblyId] = Field(default_factory=OrderedDict)
     inventory: Inventory = Field(default_factory=Inventory)
     config: ArchiveConfig = Field(default_factory=ArchiveConfig)
 
@@ -120,12 +118,21 @@ class CadArchive(BaseModel):
         assert assembly_id in self.assemblies, f"Assembly {assembly_id} not found"
         return self.assemblies[assembly_id]
 
-    def get_by_path(self, path: AssemblyPath):
+    def get_by_path(
+        self, path: AssemblyPath, type: Optional[Literal["assembly", "part"]] = None
+    ):
         assert path in self.paths, f"Assembly {path} not found"
-        assembly_type, assembly_id = self.paths[path]
+        assembly_id = self.paths[path]
+
+        assert (
+            assembly_id in self.assemblies
+            if type == "assembly"
+            else assembly_id in self.part_refs
+        ), f"{assembly_id} does is not {type}"
+
         return (
             self.assemblies[assembly_id]
-            if assembly_type == "assembly"
+            if type == "assembly"
             else self.part_refs[assembly_id]
         )
 

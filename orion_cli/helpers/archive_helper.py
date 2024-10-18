@@ -75,7 +75,7 @@ class ArchiveHelper:
                     archive.index.prev_archive
                     and part_ref.path in archive.index.prev_archive.paths
                     # if the part checksum is the same
-                    and archive.index.prev_archive.paths[part_ref.path].variation
+                    and archive.index.prev_archive.get_by_path(part_ref.path, "part").variation
                     == part_ref.variation
                 )
 
@@ -400,7 +400,7 @@ class ArchiveHelper:
 
         # Add the new path and id
         archive.assemblies[assembly.id] = assembly
-        archive.paths[assembly.path] = ("assembly", assembly.id)
+        archive.paths[assembly.path] = assembly.id
 
     @staticmethod
     def add_part_ref(
@@ -422,12 +422,12 @@ class ArchiveHelper:
         part_ref.path = new_path
         assembly.parts.append(part_ref)
         archive.part_refs[part_ref.id] = part_ref
-        archive.paths[part_ref.path] = ("part", part_ref.id)
+        archive.paths[part_ref.path] = part_ref.id
 
     @staticmethod
     def remove_assembly(archive: CadArchive, assembly_id: AssemblyId):
         assembly = archive.get_assembly(assembly_id)
-        parent_assembly = archive.get_by_path(assembly.parent_path)
+        parent_assembly = archive.get_by_path(assembly.parent_path, "assembly")
 
         assert isinstance(
             parent_assembly, Assembly
@@ -445,7 +445,7 @@ class ArchiveHelper:
     @staticmethod
     def remove_part_ref(archive: CadArchive, part_ref_id: AssemblyId):
         part_ref = archive.part_refs[part_ref_id]
-        parent_assembly = archive.get_by_path(part_ref.parent_path)
+        parent_assembly = archive.get_by_path(part_ref.parent_path, "assembly")
         assert isinstance(
             parent_assembly, Assembly
         ), f"{part_ref.parent_path} is a part not assembly"

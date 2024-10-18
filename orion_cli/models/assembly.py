@@ -107,12 +107,6 @@ class AssemblyLike(BaseModel):
         return "/".join(path_names[:-1]) or "/"
 
     @property
-    def name(self):
-        path_names = self.path.split("/")
-        assert len(path_names) > 0, "Invalid path"
-        return path_names[-1]
-
-    @property
     def long_name(self):
         return self.path.lstrip("/").replace("/", "-") if self.path else ""
 
@@ -123,6 +117,7 @@ class PartRef(AssemblyLike):
     Reference to a part in the inventory with a specific position and orientation (rotation matrix)
     """
     variation: PartVariationRef
+    name: str
 
 
 
@@ -133,3 +128,9 @@ class Assembly(AssemblyLike):
 
     children: list[AssemblyId] = Field(default_factory=list)
     parts: list[PartRef] = Field(default_factory=list)
+
+    @property
+    def name(self):
+        path_names = self.path.split("/")
+        assert len(path_names) > 0, "Invalid path"
+        return path_names[-1]

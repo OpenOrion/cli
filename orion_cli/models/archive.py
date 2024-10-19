@@ -1,4 +1,5 @@
 from typing import Any, Literal, Optional, OrderedDict
+import uuid
 from pydantic import BaseModel, ConfigDict, Field
 import cadquery as cq
 
@@ -111,9 +112,9 @@ class CadArchive(BaseModel):
     paths: OrderedDict[AssemblyPath, AssemblyId] = Field(default_factory=OrderedDict)
     inventory: Inventory = Field(default_factory=Inventory)
     config: ArchiveConfig = Field(default_factory=ArchiveConfig)
-
     index: ArchiveIndex = Field(default_factory=ArchiveIndex, exclude=True)
-
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    
     def get_assembly(self, assembly_id: AssemblyId):
         assert assembly_id in self.assemblies, f"Assembly {assembly_id} not found"
         return self.assemblies[assembly_id]

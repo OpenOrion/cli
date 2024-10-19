@@ -51,6 +51,25 @@ class CadHelper:
             [float(int(x * 255)) if i < 3 else x for i, x in enumerate(rgb_float)]
         )
 
+
+    @staticmethod
+    def read_shape_buffer(shape: Union[cq.Shape, TopoDS_Shape]):
+        shape = shape if isinstance(shape, cq.Shape) else cq.Shape(shape)
+
+        # Use BytesIO to store the BREP data
+        brep_io = BytesIO()
+
+        # Export the shape to BREP format
+        shape.exportBrep(brep_io)
+
+        # Move to the beginning of the BytesIO stream
+        brep_io.seek(0)
+
+        # Get the binary data from the BytesIO stream
+        brep_data = brep_io.read()
+
+        return brep_data
+
     @staticmethod
     def vertex_to_Tuple(vertex: TopoDS_Vertex):
         geom_point = BRep_Tool.Pnt_s(vertex)

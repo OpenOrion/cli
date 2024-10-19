@@ -2,6 +2,8 @@ from typing import Optional, Sized, Union, cast
 import numpy as np
 import cadquery as cq
 import cadquery as cq
+from pydantic import BaseModel, ConfigDict
+from orion_cli.helpers.file_helper import FileHelper
 from orion_cli.models.archive import (
     ArchiveConfig,
     Assembly,
@@ -13,8 +15,28 @@ from orion_cli.models.archive import (
     PartVariationRef,
     PartRef,
 )
-from orion_cli.models.assembly import Location, AssemblyId, Assembly
+from orion_cli.utils.logging import logger
+from orion_cli.models.assembly import Location, AssemblyId, Assembly, PartChecksum
 from orion_cli.helpers.cad_helper import CadHelper
+from jupyter_cadquery.base import (
+    _combined_bb,
+    _tessellate_group,
+    tessellation_args,
+    apply_defaults,
+)
+from jupyter_cadquery.cad_objects import to_assembly
+from orion_cli.utils.numpy import NdArray
+import zipfile
+import gzip
+from io import BytesIO
+
+class TessellatedPart(BaseModel):
+    model_config = ConfigDict(arbitrary_types_allowed=True)
+    vertices: Union[str, NdArray]
+    triangles: Union[str, NdArray]
+    normals: Union[str, NdArray]
+    edges: Union[str, NdArray]
+
 
 
 class ArchiveHelper:
@@ -43,7 +65,6 @@ class ArchiveHelper:
             archive.index.is_assembly_modified.clear()
             archive.index.is_part_modified.clear()
             ArchiveHelper.add_assembly(archive, root_assembly)
-
 
         is_modified = False
         for cq_subassembly in cq_assembly.children:
@@ -75,7 +96,9 @@ class ArchiveHelper:
                     archive.index.prev_archive
                     and part_ref.path in archive.index.prev_archive.paths
                     # if the part checksum is the same
-                    and archive.index.prev_archive.get_by_path(part_ref.path, "part").variation
+                    and archive.index.prev_archive.get_by_path(
+                        part_ref.path, "part"
+                    ).variation
                     == part_ref.variation
                 )
 
@@ -386,17 +409,16 @@ class ArchiveHelper:
                 assembly.id not in parent_assembly.children
             ), f"Assembly '{assembly.id}' already exists"
             # Update all if any child paths
-            
+
             if assembly.path != new_path:
                 for path in archive.paths:
                     if path.startswith(assembly.path):
-                        archive.paths[path.replace(assembly.path, new_path, 1)] = archive.paths[
-                            path
-                        ]
+                        archive.paths[path.replace(assembly.path, new_path, 1)] = (
+                            archive.paths[path]
+                        )
                         del archive.paths[path]
                 assembly.path = new_path
             parent_assembly.children.append(assembly.id)
-
 
         # Add the new path and id
         archive.assemblies[assembly.id] = assembly
@@ -411,7 +433,9 @@ class ArchiveHelper:
     ):
         child_name = name or part_ref.name
         assert child_name, "Invalid part reference name"
-        assembly = archive.get_assembly(assembly) if isinstance(assembly, str) else assembly
+        assembly = (
+            archive.get_assembly(assembly) if isinstance(assembly, str) else assembly
+        )
 
         new_path = f"{assembly.path}/{child_name}"
         assert new_path not in archive.paths, f"Path '{new_path}' already exists"
@@ -466,3 +490,138 @@ class ArchiveHelper:
 
         del archive.part_refs[part_ref_id]
         del archive.paths[part_ref.path]
+
+    @staticmethod
+    def create_brep_archive(archive: CadArchive) -> bytes:
+        logger.info(
+            f"Starting tessellation for CAD assembly {archive.root_assembly.name}"
+        )
+
+        # In-memory bytes buffer for the zip archive
+        zip_buffer = BytesIO()
+
+        # Create the zip file in memory
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
+            for checksum, part in archive.inventory.parts.items():
+                try:
+                    assembly = to_assembly(part, names=[checksum])
+                    logger.debug("Assembly created successfully")
+
+                    config = apply_defaults()
+                    shapes, states = _tessellate_group(assembly, tessellation_args(config))
+                    logger.debug("Tessellation completed")
+
+                    part_shape = shapes["parts"][0]["shape"]
+
+                    # Create a TessellatedPart object
+                    tessellated_part = TessellatedPart(
+                        vertices=part_shape["vertices"],
+                        triangles=part_shape["triangles"],
+                        normals=part_shape["normals"],
+                        edges=part_shape["edges"],
+                    )
+
+                    # Convert tessellated part data to JSON format
+                    part_data = tessellated_part.model_dump_json()
+
+                    # Define the part filename
+                    part_filename = f"{checksum}.json"
+                    
+                    # Write the JSON data into the in-memory zip archive
+                    zip_archive.writestr(part_filename, part_data)
+
+                except Exception as e:
+                    raise ValueError(
+                        f"Error during tessellation for CAD checksum {checksum}: {e}"
+                    )
+
+        # Move the zip buffer to the beginning before reading
+        zip_buffer.seek(0)
+
+        # In-memory bytes buffer for the gzip file
+        gz_buffer = BytesIO()
+
+        # Compress the zip file into a Gzip format in memory
+        with gzip.GzipFile(fileobj=gz_buffer, mode='wb') as gz_file:
+            gz_file.write(zip_buffer.getvalue())
+
+        # Move the gzip buffer to the beginning before returning
+        gz_buffer.seek(0)
+
+        logger.info("Tessellation completed and compressed into memory.")
+
+        # Return the gzip-compressed data as bytes
+        return gz_buffer.getvalue()
+
+
+
+    @staticmethod
+    def create_brep_buffer(archive: CadArchive) -> bytes:
+        # In-memory bytes buffer for the zip archive
+        zip_buffer = BytesIO()
+
+        # Create the zip file in memory
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
+            for checksum, part in archive.inventory.parts.items():
+                try:
+                    shape_buffer = CadHelper.read_shape_buffer(part)
+
+                    # Define the part filename
+                    part_filename = f"{checksum}.brep"
+                    
+                    # Write the JSON data into the in-memory zip archive
+                    zip_archive.writestr(part_filename, shape_buffer)
+
+                except Exception as e:
+                    raise ValueError(
+                        f"Error during tessellation for CAD checksum {checksum}: {e}"
+                    )
+
+        return FileHelper.compress_buffer(zip_buffer)
+
+
+    @staticmethod
+    def create_tessellation_buffer(archive: CadArchive) -> bytes:
+        logger.info(
+            f"Starting tessellation for CAD assembly {archive.root_assembly.name}"
+        )
+
+        # In-memory bytes buffer for the zip archive
+        zip_buffer = BytesIO()
+
+        # Create the zip file in memory
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
+            for checksum, part in archive.inventory.parts.items():
+                try:
+                    assembly = to_assembly(part, names=[checksum])
+                    logger.debug("Assembly created successfully")
+
+                    config = apply_defaults()
+                    shapes, states = _tessellate_group(assembly, tessellation_args(config))
+                    logger.debug("Tessellation completed")
+
+                    part_shape = shapes["parts"][0]["shape"]
+
+                    # Create a TessellatedPart object
+                    tessellated_part = TessellatedPart(
+                        vertices=part_shape["vertices"],
+                        triangles=part_shape["triangles"],
+                        normals=part_shape["normals"],
+                        edges=part_shape["edges"],
+                    )
+
+                    # Convert tessellated part data to JSON format
+                    part_data = tessellated_part.model_dump_json()
+
+                    # Define the part filename
+                    part_filename = f"{checksum}.json"
+                    
+                    # Write the JSON data into the in-memory zip archive
+                    zip_archive.writestr(part_filename, part_data)
+
+                except Exception as e:
+                    raise ValueError(
+                        f"Error during tessellation for CAD checksum {checksum}: {e}"
+                    )
+
+        return FileHelper.compress_buffer(zip_buffer)

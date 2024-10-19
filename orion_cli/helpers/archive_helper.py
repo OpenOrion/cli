@@ -491,69 +491,6 @@ class ArchiveHelper:
         del archive.part_refs[part_ref_id]
         del archive.paths[part_ref.path]
 
-    @staticmethod
-    def create_brep_archive(archive: CadArchive) -> bytes:
-        logger.info(
-            f"Starting tessellation for CAD assembly {archive.root_assembly.name}"
-        )
-
-        # In-memory bytes buffer for the zip archive
-        zip_buffer = BytesIO()
-
-        # Create the zip file in memory
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
-            for checksum, part in archive.inventory.parts.items():
-                try:
-                    assembly = to_assembly(part, names=[checksum])
-                    logger.debug("Assembly created successfully")
-
-                    config = apply_defaults()
-                    shapes, states = _tessellate_group(assembly, tessellation_args(config))
-                    logger.debug("Tessellation completed")
-
-                    part_shape = shapes["parts"][0]["shape"]
-
-                    # Create a TessellatedPart object
-                    tessellated_part = TessellatedPart(
-                        vertices=part_shape["vertices"],
-                        triangles=part_shape["triangles"],
-                        normals=part_shape["normals"],
-                        edges=part_shape["edges"],
-                    )
-
-                    # Convert tessellated part data to JSON format
-                    part_data = tessellated_part.model_dump_json()
-
-                    # Define the part filename
-                    part_filename = f"{checksum}.json"
-                    
-                    # Write the JSON data into the in-memory zip archive
-                    zip_archive.writestr(part_filename, part_data)
-
-                except Exception as e:
-                    raise ValueError(
-                        f"Error during tessellation for CAD checksum {checksum}: {e}"
-                    )
-
-        # Move the zip buffer to the beginning before reading
-        zip_buffer.seek(0)
-
-        # In-memory bytes buffer for the gzip file
-        gz_buffer = BytesIO()
-
-        # Compress the zip file into a Gzip format in memory
-        with gzip.GzipFile(fileobj=gz_buffer, mode='wb') as gz_file:
-            gz_file.write(zip_buffer.getvalue())
-
-        # Move the gzip buffer to the beginning before returning
-        gz_buffer.seek(0)
-
-        logger.info("Tessellation completed and compressed into memory.")
-
-        # Return the gzip-compressed data as bytes
-        return gz_buffer.getvalue()
-
-
 
     @staticmethod
     def create_brep_buffer(archive: CadArchive) -> bytes:

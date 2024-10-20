@@ -64,9 +64,9 @@ class DiffService:
 
         if diff == "delete":
             if is_assembly:
-                new_parent_assembly.remove_child(assembly_id, archive)
+                archive.remove_assembly(assembly_id)
             else:
-                new_parent_assembly.remove_part_ref(assembly_id, archive)
+                archive.remove_part_ref(assembly_id)
             return
         else:
             if diff.location:
@@ -81,11 +81,11 @@ class DiffService:
 
                 # remove from old parent and add to new parent
                 if is_assembly:
-                    parent_assembly.remove_child(assembly_id, archive)
-                    ArchiveHelper.add_assembly(archive, child, new_parent_assembly, new_child_name)
+                    archive.remove_assembly(assembly_id)
+                    archive.add_assembly(child, new_parent_assembly, new_child_name)
                 else:
-                    parent_assembly.remove_part_ref(assembly_id, archive)
-                    new_parent_assembly.add_part_ref(child, archive, new_child_name)
+                    archive.remove_part_ref(assembly_id)
+                    archive.add_part_ref(child, new_child_name)
 
     @staticmethod
     def apply_patch(project: CadArchive, patch: DiffPatch):

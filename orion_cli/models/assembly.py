@@ -1,15 +1,17 @@
 from typing import Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 import uuid
-from orion_cli.helpers.cad_helper import CadHelper
 from orion_cli.utils.numpy import NdArray
 from OCP.gp import gp_Trsf
 import numpy as np
 import cadquery as cq
 
+from orion_cli.utils.ordered_set import OrderedSet, OrderedSetAnnotated
+
 AssemblyPath = str
 AssemblyId = str
 PartChecksum = str
+
 
 class Location(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -95,10 +97,12 @@ class PartVariationRef(BaseModel):
     def __hash__(self):
         return hash((self.checksum, self.id))
 
+
 class AssemblyLike(BaseModel):
     path: AssemblyPath = Field(exclude=True, default=None)
     location: Optional[Location] = None
     id: AssemblyId = Field(default_factory=lambda: str(uuid.uuid4()))
+    name: str
 
     @property
     def parent_path(self):
@@ -111,14 +115,12 @@ class AssemblyLike(BaseModel):
         return self.path.lstrip("/").replace("/", "-") if self.path else ""
 
 
-
 class PartRef(AssemblyLike):
     """
     Reference to a part in the inventory with a specific position and orientation (rotation matrix)
     """
-    variation: PartVariationRef
-    name: str
 
+    variation: PartVariationRef
 
 
 class Assembly(AssemblyLike):
@@ -126,11 +128,11 @@ class Assembly(AssemblyLike):
     Assembly of parts and subassemblies as references
     """
 
-    children: list[AssemblyId] = Field(default_factory=list)
-    parts: list[PartRef] = Field(default_factory=list)
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
-    @property
-    def name(self):
-        path_names = self.path.split("/")
-        assert len(path_names) > 0, "Invalid path"
-        return path_names[-1]
+    children: OrderedSetAnnotated[AssemblyId] = Field(default_factory=OrderedSet)
+    parts: OrderedSetAnnotated[AssemblyId] = Field(default_factory=OrderedSet)
+
+    def set_exclude_fields(self, exclude: bool):
+        self.model_fields["children"].exclude = exclude
+        self.model_fields["parts"].exclude = exclude

@@ -16,6 +16,7 @@ from orion_cli.models.archive import (
     InventoryCatalog,
     Assembly,
 )
+from orion_cli.models.assembly import PartRef
 from orion_cli.templates.README_template import README_TEMPLATE
 from orion_cli.templates.gitignore_template import GITIGNORE_TEMPLATE
 from orion_cli.utils.logging import logger
@@ -104,8 +105,10 @@ class ArchiveService:
             logger.info(
                 f"- Generating SVG for root assembly '{archive.root_assembly.name}', this may take a sec ..."
             )
-            root_assembly_cq = ArchiveHelper.assembly_to_cq(archive, archive.root_assembly)
-            
+            root_assembly_cq = ArchiveHelper.assembly_to_cq(
+                archive, archive.root_assembly
+            )
+
             assembly_svg_options = SVGOptions(
                 showAxes=False, marginLeft=20, showHidden=False, strokeWidth=-0.9
             )
@@ -152,8 +155,15 @@ class ArchiveService:
         for assembly in archive.assemblies.values():
             subassembly_path = assembly_path / assembly.path.lstrip("/")
             subassembly_path.mkdir(parents=True, exist_ok=True)
-            with open(subassembly_path / "assembly.json", "w") as f:
-                f.write(assembly.model_dump_json(indent=4))
+            (subassembly_path / "assembly.json").write_text(
+                assembly.model_dump_json(
+                    indent=4, exclude={"children": True, "parts": True}
+                )
+            )
+            for part_id in assembly.parts:
+                part_ref = archive.part_refs[part_id]
+                part_path = subassembly_path / f"{part_ref.name}.json"
+                part_path.write_text(part_ref.model_dump_json(indent=4))
 
     # TODO: start breaking the function into smaller parts
     @staticmethod
@@ -216,7 +226,9 @@ class ArchiveService:
             ArchiveService.write_archive(archive_path, archive, verbose=verbose)
             if include_git:
                 GitHelper.initialize_repo(archive_path, remote_url)
-                GitHelper.commit_repo(archive_path, "Initial commit", author_name, author_email)
+                GitHelper.commit_repo(
+                    archive_path, "Initial commit", author_name, author_email
+                )
 
         return archive
 
@@ -287,26 +299,28 @@ class ArchiveService:
 
         assembly_path = archive_path / ASSEMBLY_DIRECTORY
 
+        # Find all JSON files that aren't assembly.json and add to archive.part_refs
         for assembly_file_path in assembly_path.rglob("assembly.json"):
             if assembly_file_path.is_file():
-                with open(assembly_file_path, "r") as f:
-                    assembly = Assembly.model_validate_json(f.read())
-                    assembly.path = (
-                        "/"
-                        + assembly_file_path.relative_to(
-                            assembly_path
-                        ).parent.as_posix()
+                if assembly_file_path.name == "assembly.json":
+                    assembly = Assembly.model_validate_json(
+                        assembly_file_path.read_text()
                     )
-                    archive.assemblies[assembly.id] = assembly
-                    archive.paths[assembly.path] = assembly.id
-                    for part_ref in assembly.parts:
-                        archive.part_refs[part_ref.id] = part_ref
-                        part_ref.path = assembly.path + "/" + part_ref.name
-                        archive.paths[part_ref.path] = part_ref.id
+                    assembly.path = (
+                        f"/{assembly_file_path.parent.relative_to(assembly_path)}"
+                    )
+                    parent_assembly = archive.get_by_path(
+                        assembly.parent_path, "assembly"
+                    )
 
+                    archive.add_assembly(assembly, parent_assembly)
+                    for part_file_path in assembly_file_path.parent.glob("*.json"):
+                        if part_file_path.name != "assembly.json":
+                            part_ref = PartRef.model_validate_json(
+                                part_file_path.read_text()
+                            )
+                            archive.add_part_ref(part_ref, assembly)
         return archive
-
-    
 
     @staticmethod
     def visualize_archive(

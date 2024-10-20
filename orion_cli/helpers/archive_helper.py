@@ -14,6 +14,7 @@ from orion_cli.models.archive import (
     InventoryPartVariation,
     PartVariationRef,
     PartRef,
+    AssemblyPath,
 )
 from orion_cli.utils.logging import logger
 from orion_cli.models.assembly import Location, AssemblyId, Assembly, PartChecksum
@@ -30,13 +31,13 @@ import zipfile
 import gzip
 from io import BytesIO
 
+
 class TessellatedPart(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
     vertices: Union[str, NdArray]
     triangles: Union[str, NdArray]
     normals: Union[str, NdArray]
     edges: Union[str, NdArray]
-
 
 
 class ArchiveHelper:
@@ -56,6 +57,7 @@ class ArchiveHelper:
         abs_location = rel_location.transform(curr_abs_location)
 
         root_assembly = Assembly(
+            name=cq_assembly.name,
             path=curr_path + f"/{cq_assembly.name}",
             location=rel_location if not rel_location.is_zero else None,
         )
@@ -64,7 +66,7 @@ class ArchiveHelper:
         if curr_path == "":
             archive.index.is_assembly_modified.clear()
             archive.index.is_part_modified.clear()
-            ArchiveHelper.add_assembly(archive, root_assembly)
+            archive.add_assembly(root_assembly)
 
         is_modified = False
         for cq_subassembly in cq_assembly.children:
@@ -75,7 +77,7 @@ class ArchiveHelper:
                     abs_location,
                     root_assembly.path,
                 )
-                ArchiveHelper.add_assembly(archive, subassemblies[0], root_assembly)
+                archive.add_assembly(subassemblies[0], root_assembly)
                 assemblies.extend(subassemblies)
 
                 is_modified = is_modified or is_sub_modified
@@ -94,7 +96,7 @@ class ArchiveHelper:
                 is_modified = not (
                     # has the part id been previously indexed
                     archive.index.prev_archive
-                    and part_ref.path in archive.index.prev_archive.paths
+                    and part_ref.path in archive.index.prev_archive.index.paths
                     # if the part checksum is the same
                     and archive.index.prev_archive.get_by_path(
                         part_ref.path, "part"
@@ -107,7 +109,7 @@ class ArchiveHelper:
                     archive.index.is_assembly_modified.add(part_ref.id)
 
                 # add part reference to root assembly and archive
-                ArchiveHelper.add_part_ref(archive, part_ref, root_assembly)
+                archive.add_part_ref(part_ref, root_assembly)
 
                 # add part to inventory
                 if part_ref.variation.checksum not in archive.inventory.parts:
@@ -363,7 +365,8 @@ class ArchiveHelper:
                 loc=asm_abs_location.to_cq(),
                 name=subassembly.name,
             )
-        for part_ref in assembly.parts:
+        for part_ref_id in assembly.parts:
+            part_ref = archive.part_refs[part_ref_id]
             part = archive.inventory.parts[part_ref.variation.checksum]
             cq_loc = part_ref.location and part_ref.location.to_cq()
             part_variation = archive.inventory.get_variation(part_ref.variation)
@@ -388,124 +391,19 @@ class ArchiveHelper:
         return cq_assembly
 
     @staticmethod
-    def add_assembly(
-        archive: CadArchive,
-        assembly: Assembly,
-        parent_assembly: Union[str, Assembly, None] = None,
-        name: Optional[str] = None,
-    ):
-        child_name = name or assembly.name
-        assert child_name, "Invalid assembly name"
-
-        parent_assembly = (
-            archive.get_assembly(parent_assembly)
-            if isinstance(parent_assembly, str)
-            else parent_assembly
-        )
-        if parent_assembly:
-            new_path = f"{parent_assembly.path}/{child_name}"
-            assert new_path not in archive.paths, f"Path '{new_path}' already exists"
-            assert (
-                assembly.id not in parent_assembly.children
-            ), f"Assembly '{assembly.id}' already exists"
-            # Update all if any child paths
-
-            if assembly.path != new_path:
-                for path in archive.paths:
-                    if path.startswith(assembly.path):
-                        archive.paths[path.replace(assembly.path, new_path, 1)] = (
-                            archive.paths[path]
-                        )
-                        del archive.paths[path]
-                assembly.path = new_path
-            parent_assembly.children.append(assembly.id)
-
-        # Add the new path and id
-        archive.assemblies[assembly.id] = assembly
-        archive.paths[assembly.path] = assembly.id
-
-    @staticmethod
-    def add_part_ref(
-        archive: CadArchive,
-        part_ref: PartRef,
-        assembly: Union[str, Assembly],
-        name: Optional[str] = None,
-    ):
-        child_name = name or part_ref.name
-        assert child_name, "Invalid part reference name"
-        assembly = (
-            archive.get_assembly(assembly) if isinstance(assembly, str) else assembly
-        )
-
-        new_path = f"{assembly.path}/{child_name}"
-        assert new_path not in archive.paths, f"Path '{new_path}' already exists"
-        assert (
-            part_ref.id not in assembly.parts
-        ), f"Part reference {part_ref.id} already exists"
-
-        part_ref.path = new_path
-        assembly.parts.append(part_ref)
-        archive.part_refs[part_ref.id] = part_ref
-        archive.paths[part_ref.path] = part_ref.id
-
-    @staticmethod
-    def remove_assembly(archive: CadArchive, assembly_id: AssemblyId):
-        assembly = archive.get_assembly(assembly_id)
-        parent_assembly = archive.get_by_path(assembly.parent_path, "assembly")
-
-        assert isinstance(
-            parent_assembly, Assembly
-        ), f"f{assembly.parent_path} is a part not assembly "
-        assert (
-            assembly_id in parent_assembly.children
-        ), f"Assembly '{assembly_id}' not found in parent '{parent_assembly.id}'"
-        assert assembly_id in archive.assemblies, f"Assembly '{assembly_id}' not found"
-        assert assembly.path in archive.paths, f"Assembly '{assembly.path}' not found"
-
-        parent_assembly.children.remove(assembly_id)
-        del archive.assemblies[assembly_id]
-        del archive.paths[assembly.path]
-
-    @staticmethod
-    def remove_part_ref(archive: CadArchive, part_ref_id: AssemblyId):
-        part_ref = archive.part_refs[part_ref_id]
-        parent_assembly = archive.get_by_path(part_ref.parent_path, "assembly")
-        assert isinstance(
-            parent_assembly, Assembly
-        ), f"{part_ref.parent_path} is a part not assembly"
-
-        for i, part_ref in enumerate(parent_assembly.parts):
-            if part_ref.id == part_ref_id:
-                del parent_assembly.parts[i]
-                break
-        else:
-            assert False, f"Part reference '{part_ref_id}' not found in parent assembly"
-
-        assert (
-            part_ref_id in archive.part_refs
-        ), f"Part reference '{part_ref_id}' not found"
-        assert (
-            part_ref.path in archive.paths
-        ), f"Part reference '{part_ref.path}' not found"
-
-        del archive.part_refs[part_ref_id]
-        del archive.paths[part_ref.path]
-
-
-    @staticmethod
     def create_brep_buffer(archive: CadArchive) -> bytes:
         # In-memory bytes buffer for the zip archive
         zip_buffer = BytesIO()
 
         # Create the zip file in memory
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_archive:
             for checksum, part in archive.inventory.parts.items():
                 try:
                     shape_buffer = CadHelper.read_shape_buffer(part)
 
                     # Define the part filename
                     part_filename = f"{checksum}.brep"
-                    
+
                     # Write the JSON data into the in-memory zip archive
                     zip_archive.writestr(part_filename, shape_buffer)
 
@@ -515,7 +413,6 @@ class ArchiveHelper:
                     )
 
         return FileHelper.compress_buffer(zip_buffer)
-
 
     @staticmethod
     def create_tessellation_buffer(archive: CadArchive) -> bytes:
@@ -527,14 +424,16 @@ class ArchiveHelper:
         zip_buffer = BytesIO()
 
         # Create the zip file in memory
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_archive:
+        with zipfile.ZipFile(zip_buffer, "w", zipfile.ZIP_DEFLATED) as zip_archive:
             for checksum, part in archive.inventory.parts.items():
                 try:
                     assembly = to_assembly(part, names=[checksum])
                     logger.debug("Assembly created successfully")
 
                     config = apply_defaults()
-                    shapes, states = _tessellate_group(assembly, tessellation_args(config))
+                    shapes, states = _tessellate_group(
+                        assembly, tessellation_args(config)
+                    )
                     logger.debug("Tessellation completed")
 
                     part_shape = shapes["parts"][0]["shape"]
@@ -552,7 +451,7 @@ class ArchiveHelper:
 
                     # Define the part filename
                     part_filename = f"{checksum}.json"
-                    
+
                     # Write the JSON data into the in-memory zip archive
                     zip_archive.writestr(part_filename, part_data)
 

@@ -5,7 +5,7 @@ from orion_cli.utils.numpy import NdArray
 from OCP.gp import gp_Trsf
 import numpy as np
 import cadquery as cq
-
+from scipy.spatial.transform import Rotation as R
 from orion_cli.utils.ordered_set import OrderedSet, OrderedSetAnnotated
 
 AssemblyPath = str
@@ -13,32 +13,29 @@ AssemblyId = str
 PartChecksum = str
 
 
+
+
 class Location(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
-    position: NdArray
-    orientation: NdArray
+    position: NdArray  # Assuming position is a 1D array with 3 elements
+    orientation: NdArray  # Quaternion as [x, y, z, w]
 
     def to_cq(self):
+        # Convert quaternion to rotation matrix
+        rotation = R.from_quat(self.orientation).as_matrix()
+
+        # Create the transformation using the position and the rotation matrix
         transformation = gp_Trsf()
         transformation.SetValues(
-            self.orientation[0][0],
-            self.orientation[0][1],
-            self.orientation[0][2],
-            self.position[0],
-            self.orientation[1][0],
-            self.orientation[1][1],
-            self.orientation[1][2],
-            self.position[1],
-            self.orientation[2][0],
-            self.orientation[2][1],
-            self.orientation[2][2],
-            self.position[2],
+            rotation[0][0], rotation[0][1], rotation[0][2], self.position[0],
+            rotation[1][0], rotation[1][1], rotation[1][2], self.position[1],
+            rotation[2][0], rotation[2][1], rotation[2][2], self.position[2],
         )
         return cq.Location(transformation)
 
     @property
     def is_zero(self):
-        return np.all(self.position == 0) and np.all(self.orientation == np.eye(3))
+        return np.all(self.position == 0) and np.all(self.orientation == np.array([0, 0, 0, 1]))
 
     def transform(self, location: Union["Location", cq.Location, None]):
         if location is None:
@@ -47,18 +44,25 @@ class Location(BaseModel):
         if isinstance(location, cq.Location):
             location = Location.convert(location)
 
+        # Add positions
+        new_position = self.position + location.position
+
+        # Multiply quaternions to combine orientations
+        new_orientation = R.from_quat(self.orientation) * R.from_quat(location.orientation)
+
         return Location(
-            position=self.position + location.position,
-            orientation=self.orientation.dot(location.orientation),
+            position=new_position,
+            orientation=new_orientation.as_quat()
         )
 
     @staticmethod
     def convert(loc: Union["Location", cq.Location, None]):
         if loc is None:
-            return Location(position=np.zeros(3), orientation=np.eye(3))
+            return Location(position=np.zeros(3), orientation=np.array([0, 0, 0, 1]))
         if isinstance(loc, Location):
             return loc
 
+        # Extract the translation from the cadquery Location object
         transformation = loc.wrapped.Transformation()
         translation = np.array(
             [
@@ -67,6 +71,8 @@ class Location(BaseModel):
                 transformation.Value(3, 4),
             ]
         )
+
+        # Extract rotation matrix and convert to quaternion
         rotmat = np.array(
             [
                 [
@@ -87,7 +93,10 @@ class Location(BaseModel):
             ]
         )
 
-        return Location(position=translation, orientation=rotmat)
+        # Convert rotation matrix to quaternion
+        quaternion = R.from_matrix(rotmat).as_quat()
+
+        return Location(position=translation, orientation=quaternion)
 
 
 class PartVariationRef(BaseModel):

@@ -107,6 +107,7 @@ class ArchiveIndex(BaseModel):
     paths: OrderedDict[AssemblyPath, AssemblyId] = Field(default_factory=OrderedDict)
 
 class CadArchive(BaseModel):
+    root_assembly_id: Optional[AssemblyId] = None
     assemblies: OrderedDict[AssemblyId, Assembly] = Field(default_factory=OrderedDict)
     part_refs: OrderedDict[AssemblyId, PartRef] = Field(default_factory=OrderedDict)
     inventory: Inventory = Field(default_factory=Inventory)
@@ -119,8 +120,8 @@ class CadArchive(BaseModel):
         if len(self.assemblies) > 0:
             self.init_assembly(self.root_assembly)
 
-    def init_assembly(self, assembly: Assembly, parent_path: AssemblyPath = ""):
-        self.add_assembly(assembly, parent_path)
+    def init_assembly(self, assembly: Assembly, parent_path: Optional[AssemblyPath] = None):
+        self.add_assembly(assembly, parent_path or "")
         for part_id in assembly.parts:
             self.add_part_ref(self.part_refs[part_id], assembly)
         for child_id in assembly.children:
@@ -138,9 +139,15 @@ class CadArchive(BaseModel):
         self.part_refs[part_ref.id] = part_ref
         self.index.paths[part_ref.path] = part_ref.id
 
+    @property
+    def root_assembly(self):
+        return self.get_assembly(self.root_assembly_id)
+
     def add_assembly(
         self, assembly: Assembly, parent: Union[Assembly, AssemblyPath, None] = None
     ):
+        if not parent and not self.root_assembly_id:
+            self.root_assembly_id = assembly.id
 
         parent_assembly = None
         if isinstance(parent, Assembly):
@@ -148,7 +155,7 @@ class CadArchive(BaseModel):
             parent_assembly = parent
         elif isinstance(parent, AssemblyPath):
             parent_path = parent
-            parent_assembly = self.get_by_path(parent_path)
+            parent_assembly = self.get_by_path(parent_path, "assembly")
         else:
             parent_path = ""
 
@@ -216,7 +223,7 @@ class CadArchive(BaseModel):
             return self.assemblies[assembly_id]
 
     def get_by_path(
-        self, path: AssemblyPath, type: Optional[Literal["assembly", "part"]] = None
+        self, path: AssemblyPath, type: Literal["assembly", "part"] = "assembly"
     ):
         if path in self.index.paths:
             assembly_id = self.index.paths[path]
@@ -232,10 +239,6 @@ class CadArchive(BaseModel):
                 if type == "assembly"
                 else self.part_refs[assembly_id]
             )
-
-    @property
-    def root_assembly(self):
-        return next(iter(self.assemblies.values()))
 
     def model_copy(self, *, update: dict[str, Any] | None = None, deep: bool = False):
         part_refs = OrderedDict[AssemblyId, PartRef]()

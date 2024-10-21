@@ -324,7 +324,7 @@ class ArchiveService:
 
     @staticmethod
     def visualize_archive(
-        archive_path: Union[Path, str],
+        archive: Union[Path, str, CadArchive],
         remote_viewer=False,
         export_html=True,
         auto_open=True,
@@ -332,19 +332,22 @@ class ArchiveService:
     ):
         logger.setLevel(logging.INFO if verbose else logging.ERROR)
 
-        archive_path = Path(archive_path)
-        archive = ArchiveService.read_archive(archive_path)
+        orion_cache_path = None
+        if not isinstance(archive, CadArchive):
+            archive_path = Path(archive)
+            archive = ArchiveService.read_archive(archive_path)
+            orion_cache_path = archive_path / ".orion_cache"
+            orion_cache_path.mkdir(parents=True, exist_ok=True)
+        
         cq_assembly = ArchiveHelper.assembly_to_cq(archive, archive.root_assembly)
 
-        orion_cache_path = archive_path / ".orion_cache"
-        orion_cache_path.mkdir(parents=True, exist_ok=True)
-
         logger.info(f"Generating visualization")
+        tess_cache_path = orion_cache_path / "tesselation.cache" if orion_cache_path else None
         viewer = CadHelper.get_viewer(
-            cq_assembly, orion_cache_path / "tesselation.cache", remote_viewer
+            cq_assembly, tess_cache_path, remote_viewer
         )
 
-        if viewer and export_html:
+        if orion_cache_path and viewer and export_html:
             html_path = orion_cache_path / "index.html"
             viewer.export_html(str(html_path))
             logger.info(f"\n\nExported HTML to {html_path}")

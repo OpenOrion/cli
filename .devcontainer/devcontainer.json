@@ -7,7 +7,7 @@
 	"features": {
 		"ghcr.io/devcontainers-contrib/features/pipx-package:1": {},
 		"ghcr.io/devcontainers-contrib/features/poetry:2": {},
-		"ghcr.io/rocker-org/devcontainer-features/miniforge:1": {}
+		"ghcr.io/rocker-org/devcontainer-features/miniforge:2": {}
 	},
 
 	"build": {
